@@ -57,7 +57,9 @@ function SettingsPage() {
               Salva
             </Button>
           </div>
-          <p className="mt-3 font-mono text-xs text-muted-foreground">chiave: {getGuestKey()}</p>
+          <p className="mt-3 font-mono text-xs text-muted-foreground">
+            chiave: {guestKey || "…"}
+          </p>
         </section>
 
         <section className="rounded-lg border border-border bg-card p-4">
