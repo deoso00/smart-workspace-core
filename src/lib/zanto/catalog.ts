@@ -29,6 +29,16 @@ export type ProviderInfo = {
 
 export const PROVIDERS: ProviderInfo[] = [
   {
+    id: "google",
+    label: "Google Gemini",
+    builtInKey: true,
+    runtime: "cloud",
+    description: "Gemini API diretta tramite la chiave GEMINI_API_KEY configurata sul server.",
+    models: [
+      { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Veloce, ottimo per agent e codice" },
+    ],
+  },
+  {
     id: "lovable",
     label: "Lovable AI",
     builtInKey: true,
