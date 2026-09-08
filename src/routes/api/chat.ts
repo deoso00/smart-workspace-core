@@ -293,17 +293,22 @@ export const Route = createFileRoute("/api/chat")({
               }
             };
             try {
+              const timeout = AbortSignal.timeout(85_000);
+              const signal = AbortSignal.any
+                ? AbortSignal.any([request.signal, timeout])
+                : request.signal;
+
               const result = streamText({
                 model,
                 system,
                 messages: modelMessages,
                 maxRetries: 1,
                 ...(useAgent ? { tools, stopWhen: stepCountIs(AGENT_MAX_STEPS) } : {}),
-                abortSignal: request.signal,
+                abortSignal: signal,
               });
 
               for await (const part of result.fullStream) {
-                if (request.signal.aborted) break;
+                if (signal.aborted) break;
                 if (part.type === "text-delta") {
                   controller.enqueue(jsonLine({ t: "text", v: part.text }));
                 } else if (part.type === "tool-call") {
@@ -334,7 +339,17 @@ export const Route = createFileRoute("/api/chat")({
               close();
             } catch (error) {
               if (!request.signal.aborted) {
-                controller.enqueue(jsonLine({ t: "error", v: formatChatError(error) }));
+                const timedOut =
+                  error instanceof Error &&
+                  (error.name === "TimeoutError" || /aborted|timeout/i.test(error.message));
+                controller.enqueue(
+                  jsonLine({
+                    t: "error",
+                    v: timedOut
+                      ? "Timeout verso Gemini. Riprova con Agent spento o un messaggio più corto."
+                      : formatChatError(error),
+                  }),
+                );
               }
               close();
             }

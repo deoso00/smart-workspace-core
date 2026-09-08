@@ -2,14 +2,14 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 /**
  * Google Gemini via the official OpenAI-compatible API.
- * Key comes only from server env GEMINI_API_KEY — never from the browser.
+ * Prefer the browser key from Providers; optional GEMINI_API_KEY env fallback on the server.
  * Lovable hosts the app; Google bills this usage (not Lovable AI Gateway credits).
  */
 export function createGeminiProvider(apiKey: string) {
   return createOpenAICompatible({
     name: "google",
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-    headers: { Authorization: `Bearer ${apiKey}` },
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    apiKey,
   });
 }
 

@@ -52,7 +52,7 @@ export function ChatWorkspace() {
   const [provider, setProvider] = useState("google");
   const [model, setModel] = useState("gemini-3.7-flash");
   const [mode, setMode] = useState("AUTO");
-  const [agent, setAgent] = useState(true);
+  const [agent, setAgent] = useState(false);
   const [input, setInput] = useState("");
   const [streamText, setStreamText] = useState("");
   const [tools, setTools] = useState<ToolActivity[]>([]);
@@ -178,6 +178,11 @@ export function ChatWorkspace() {
     abortRef.current = controller;
     let assembled = "";
     const collected: ToolActivity[] = [];
+    let sawError = false;
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+      toast.error("Timeout: Gemini non ha risposto in tempo. Riprova o disattiva Agent.");
+    }, 90_000);
 
     try {
       await streamChat(
@@ -207,29 +212,43 @@ export function ChatWorkspace() {
             else collected.push(activity);
             setTools([...collected]);
           },
-          onError: (message) => toast.error(message),
+          onError: (message) => {
+            sawError = true;
+            toast.error(message);
+          },
         },
         controller.signal,
       );
+
+      if (!sawError && !assembled.trim() && collected.length === 0) {
+        toast.error(
+          "Nessuna risposta da Gemini. Controlla la API key in Providers e riprova (Agent spento).",
+        );
+      }
     } catch (error) {
       if ((error as Error).name !== "AbortError") toast.error((error as Error).message);
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (assembled.trim() || collected.length > 0) {
+        try {
+          await addMessage(
+            conversationId,
+            "assistant",
+            assembled || "(interrotto)",
+            collected as unknown[],
+          );
+        } catch (error) {
+          toast.error((error as Error).message);
+        }
+      }
+      setStreamText("");
+      setBusy(false);
+      abortRef.current = null;
+      void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["vfs", workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["activity", workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["memory", workspaceId] });
     }
-
-    if (assembled.trim() || collected.length > 0) {
-      await addMessage(
-        conversationId,
-        "assistant",
-        assembled || "(interrotto)",
-        collected as unknown[],
-      );
-    }
-    setStreamText("");
-    setBusy(false);
-    abortRef.current = null;
-    void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-    void queryClient.invalidateQueries({ queryKey: ["vfs", workspaceId] });
-    void queryClient.invalidateQueries({ queryKey: ["activity", workspaceId] });
-    void queryClient.invalidateQueries({ queryKey: ["memory", workspaceId] });
   };
 
   if (loading || !workspaceId) {
