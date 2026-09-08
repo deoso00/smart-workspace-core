@@ -23,7 +23,7 @@ export function CommandPalette({
   const { toggle } = useTheme();
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="Command palette">
+    <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput placeholder="Cerca pagine, workspace, azioni…" />
       <CommandList>
         <CommandEmpty>Nessun risultato.</CommandEmpty>

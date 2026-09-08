@@ -1,21 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  Boxes,
-  Cpu,
-  Files,
-  FolderKanban,
-  Keyboard,
-  Layers,
-  MessagesSquare,
-  Moon,
-  Plug,
-  Server,
-  Settings as SettingsIcon,
-  Sun,
-  Wrench,
-  Brain,
-  Activity as ActivityIcon,
-} from "lucide-react";
+import { Keyboard, Moon, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,24 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NAV_ITEMS } from "@/lib/zanto/nav";
 import { useTheme } from "@/lib/zanto/theme";
 import { useWorkspace } from "@/lib/zanto/workspace-context";
 import { CommandPalette } from "./CommandPalette";
 
-export const NAV_ITEMS = [
-  { to: "/", label: "Chat", icon: MessagesSquare },
-  { to: "/projects", label: "Projects", icon: FolderKanban },
-  { to: "/workspaces", label: "Workspaces", icon: Layers },
-  { to: "/files", label: "Files", icon: Files },
-  { to: "/models", label: "Models", icon: Cpu },
-  { to: "/providers", label: "Providers", icon: Server },
-  { to: "/memory", label: "Memory", icon: Brain },
-  { to: "/plugins", label: "Plugins", icon: Plug },
-  { to: "/mcp", label: "MCP", icon: Boxes },
-  { to: "/tools", label: "Tools", icon: Wrench },
-  { to: "/activity", label: "Activity", icon: ActivityIcon },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
-] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { theme, toggle } = useTheme();
@@ -79,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Badge>
 
         <div className="ml-auto flex items-center gap-2">
-          <Select value={activeId ?? undefined} onValueChange={setActiveId}>
+          <Select value={activeId ?? ""} onValueChange={setActiveId}>
             <SelectTrigger className="h-9 w-[170px] text-xs md:w-[210px]">
               <SelectValue placeholder="Workspace" />
             </SelectTrigger>
