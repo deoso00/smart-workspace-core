@@ -14,9 +14,9 @@ export type Activity = Tables<"activity_log">;
 export type ToolPermission = Tables<"tool_permissions">;
 export type MemoryNote = Tables<"memory_notes">;
 
-function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
+function unwrap<T>(res: { data: T; error: { message: string } | null }): NonNullable<T> {
   if (res.error) throw new Error(res.error.message);
-  return res.data as T;
+  return res.data as NonNullable<T>;
 }
 
 /* ---------------------------------- workspaces --------------------------------- */
