@@ -1,6 +1,19 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
-/** Lovable AI Gateway provider (no user key required). */
+/**
+ * Google Gemini via the official OpenAI-compatible API.
+ * Key comes only from server env GEMINI_API_KEY — never from the browser.
+ * Lovable hosts the app; Google bills this usage (not Lovable AI Gateway credits).
+ */
+export function createGeminiProvider(apiKey: string) {
+  return createOpenAICompatible({
+    name: "google",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+}
+
+/** Lovable AI Gateway (optional). Uses Lovable AI Gateway credits. */
 export function createLovableAiGatewayProvider(apiKey: string) {
   return createOpenAICompatible({
     name: "lovable",
