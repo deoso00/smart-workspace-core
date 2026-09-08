@@ -5,17 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * ZAnto.AI design system — futuristic workspace chrome.
+ * Primary accent: fluorescent green. Dark is default; light remains supported.
  */
 
 @theme inline {
@@ -59,79 +50,84 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.985 0.004 250);
-  --foreground: oklch(0.19 0.02 255);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.19 0.02 255);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.19 0.02 255);
-  --primary: oklch(0.62 0.13 195);
-  --primary-foreground: oklch(0.99 0.01 200);
-  --secondary: oklch(0.945 0.008 250);
-  --secondary-foreground: oklch(0.28 0.03 255);
-  --muted: oklch(0.955 0.006 250);
-  --muted-foreground: oklch(0.52 0.02 255);
-  --accent: oklch(0.93 0.03 195);
-  --accent-foreground: oklch(0.25 0.05 210);
+  --radius: 0.65rem;
+  --background: oklch(0.97 0.01 145);
+  --foreground: oklch(0.2 0.03 150);
+  --card: oklch(0.99 0.005 145);
+  --card-foreground: oklch(0.2 0.03 150);
+  --popover: oklch(0.99 0.005 145);
+  --popover-foreground: oklch(0.2 0.03 150);
+  --primary: oklch(0.52 0.17 145);
+  --primary-foreground: oklch(0.99 0.01 145);
+  --secondary: oklch(0.94 0.02 145);
+  --secondary-foreground: oklch(0.28 0.04 150);
+  --muted: oklch(0.95 0.015 145);
+  --muted-foreground: oklch(0.48 0.03 150);
+  --accent: oklch(0.93 0.04 145);
+  --accent-foreground: oklch(0.28 0.08 145);
   --destructive: oklch(0.58 0.2 22);
   --destructive-foreground: oklch(0.99 0.01 20);
-  --border: oklch(0.9 0.008 250);
-  --input: oklch(0.9 0.008 250);
-  --ring: oklch(0.62 0.13 195);
-  --chart-1: oklch(0.62 0.13 195);
+  --border: oklch(0.88 0.02 145);
+  --input: oklch(0.9 0.02 145);
+  --ring: oklch(0.52 0.17 145);
+  --chart-1: oklch(0.52 0.17 145);
   --chart-2: oklch(0.7 0.15 75);
   --chart-3: oklch(0.55 0.15 275);
-  --chart-4: oklch(0.65 0.14 145);
+  --chart-4: oklch(0.65 0.14 180);
   --chart-5: oklch(0.6 0.19 20);
-  --sidebar: oklch(0.97 0.005 250);
-  --sidebar-foreground: oklch(0.24 0.02 255);
-  --sidebar-primary: oklch(0.62 0.13 195);
-  --sidebar-primary-foreground: oklch(0.99 0.01 200);
-  --sidebar-accent: oklch(0.93 0.02 195);
-  --sidebar-accent-foreground: oklch(0.25 0.04 210);
-  --sidebar-border: oklch(0.9 0.008 250);
-  --sidebar-ring: oklch(0.62 0.13 195);
-  --zanto-glow: oklch(0.62 0.13 195 / 25%);
+  --sidebar: oklch(0.96 0.012 145);
+  --sidebar-foreground: oklch(0.24 0.03 150);
+  --sidebar-primary: oklch(0.52 0.17 145);
+  --sidebar-primary-foreground: oklch(0.99 0.01 145);
+  --sidebar-accent: oklch(0.92 0.04 145);
+  --sidebar-accent-foreground: oklch(0.28 0.08 145);
+  --sidebar-border: oklch(0.88 0.02 145);
+  --sidebar-ring: oklch(0.52 0.17 145);
+  --zanto-glow: oklch(0.52 0.17 145 / 22%);
+  --zanto-grid: oklch(0.52 0.17 145 / 6%);
 }
 
 .dark {
-  --background: oklch(0.17 0.017 258);
-  --foreground: oklch(0.94 0.008 250);
-  --card: oklch(0.215 0.02 258);
-  --card-foreground: oklch(0.94 0.008 250);
-  --popover: oklch(0.215 0.02 258);
-  --popover-foreground: oklch(0.94 0.008 250);
-  --primary: oklch(0.78 0.13 190);
-  --primary-foreground: oklch(0.19 0.03 220);
-  --secondary: oklch(0.26 0.02 258);
-  --secondary-foreground: oklch(0.93 0.008 250);
-  --muted: oklch(0.25 0.018 258);
-  --muted-foreground: oklch(0.68 0.015 255);
-  --accent: oklch(0.3 0.04 195);
-  --accent-foreground: oklch(0.94 0.02 195);
+  --background: oklch(0.13 0.02 160);
+  --foreground: oklch(0.94 0.015 145);
+  --card: oklch(0.17 0.025 160 / 82%);
+  --card-foreground: oklch(0.94 0.015 145);
+  --popover: oklch(0.16 0.025 160);
+  --popover-foreground: oklch(0.94 0.015 145);
+  --primary: oklch(0.84 0.24 145);
+  --primary-foreground: oklch(0.14 0.04 160);
+  --secondary: oklch(0.22 0.03 160);
+  --secondary-foreground: oklch(0.92 0.02 145);
+  --muted: oklch(0.2 0.025 160);
+  --muted-foreground: oklch(0.68 0.03 150);
+  --accent: oklch(0.24 0.06 145);
+  --accent-foreground: oklch(0.9 0.08 145);
   --destructive: oklch(0.68 0.19 22);
   --destructive-foreground: oklch(0.16 0.02 20);
-  --border: oklch(1 0 0 / 11%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.78 0.13 190);
-  --chart-1: oklch(0.78 0.13 190);
+  --border: oklch(0.84 0.12 145 / 18%);
+  --input: oklch(0.84 0.12 145 / 22%);
+  --ring: oklch(0.84 0.24 145);
+  --chart-1: oklch(0.84 0.24 145);
   --chart-2: oklch(0.8 0.15 78);
   --chart-3: oklch(0.68 0.15 285);
-  --chart-4: oklch(0.75 0.14 150);
+  --chart-4: oklch(0.75 0.14 180);
   --chart-5: oklch(0.7 0.18 20);
-  --sidebar: oklch(0.195 0.018 258);
-  --sidebar-foreground: oklch(0.92 0.008 250);
-  --sidebar-primary: oklch(0.78 0.13 190);
-  --sidebar-primary-foreground: oklch(0.19 0.03 220);
-  --sidebar-accent: oklch(0.28 0.035 195);
-  --sidebar-accent-foreground: oklch(0.94 0.02 195);
-  --sidebar-border: oklch(1 0 0 / 11%);
-  --sidebar-ring: oklch(0.78 0.13 190);
-  --zanto-glow: oklch(0.78 0.13 190 / 18%);
+  --sidebar: oklch(0.11 0.022 160);
+  --sidebar-foreground: oklch(0.9 0.02 145);
+  --sidebar-primary: oklch(0.84 0.24 145);
+  --sidebar-primary-foreground: oklch(0.14 0.04 160);
+  --sidebar-accent: oklch(0.2 0.05 145);
+  --sidebar-accent-foreground: oklch(0.9 0.1 145);
+  --sidebar-border: oklch(0.84 0.12 145 / 14%);
+  --sidebar-ring: oklch(0.84 0.24 145);
+  --zanto-glow: oklch(0.84 0.24 145 / 20%);
+  --zanto-grid: oklch(0.84 0.24 145 / 5%);
 }
 
 @layer base {
@@ -142,17 +138,6 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-  }
-}
-
-@theme inline {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-}
-
-@layer base {
-  body {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
@@ -162,7 +147,7 @@
   h3,
   .font-display {
     font-family: var(--font-display);
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
   }
 
   code,
@@ -172,8 +157,8 @@
   }
 
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -181,16 +166,67 @@
   ::-webkit-scrollbar-thumb {
     background: var(--color-border);
     border-radius: 9999px;
-    border: 3px solid transparent;
-    background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-muted-foreground);
-    background-clip: content-box;
   }
 }
 
 @utility zanto-panel {
-  background-color: var(--color-card);
-  border-color: var(--color-border);
+  background-color: color-mix(in oklch, var(--color-card) 88%, transparent);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+}
+
+@utility zanto-glass {
+  background: color-mix(in oklch, var(--color-card) 72%, transparent);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(16px);
+}
+
+@utility zanto-glow-sm {
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 28%, transparent),
+    0 0 18px var(--zanto-glow);
+}
+
+@utility zanto-grid-bg {
+  background-image: linear-gradient(var(--zanto-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--zanto-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@utility zanto-online-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px var(--zanto-glow);
+  animation: zanto-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes zanto-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes zanto-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility zanto-enter {
+  animation: zanto-fade-in 0.28s ease-out both;
 }

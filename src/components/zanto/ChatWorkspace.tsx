@@ -255,28 +255,31 @@ export function ChatWorkspace() {
     return (
       <div className="grid h-full place-items-center text-sm text-muted-foreground">
         <span className="flex items-center gap-2">
-          <Loader2 className="size-4 animate-spin" /> Preparo il workspace…
+          <Loader2 className="size-4 animate-spin text-primary" /> Preparo il workspace…
         </span>
       </div>
     );
   }
 
+  const selectableProviders = PROVIDERS;
+  const selectableModels = providerInfo?.models ?? [];
+
   return (
     <div className="flex h-full min-h-0">
-      {/* Panel 1: conversations */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Conversazioni
+      {/* Conversations strip */}
+      <aside className="zanto-glass hidden w-[13.5rem] shrink-0 flex-col border-r border-border/80 md:flex">
+        <div className="flex items-center gap-2 border-b border-border/80 px-3 py-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Chat
           </span>
           <Button
             size="icon"
             variant="ghost"
-            className="ml-auto"
+            className="ml-auto size-7"
             title="Nuova conversazione"
             onClick={() => newConversation.mutate()}
           >
-            <Plus className="size-4" />
+            <Plus className="size-3.5" />
           </Button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -288,15 +291,15 @@ export function ChatWorkspace() {
           {conversations.map((convo) => (
             <div
               key={convo.id}
-              className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm ${
+              className={`group mb-0.5 flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors ${
                 convoId === convo.id
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "hover:bg-sidebar-accent/50"
+                  ? "zanto-glow-sm bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "hover:bg-sidebar-accent/40"
               }`}
             >
               <button
                 type="button"
-                className="min-w-0 flex-1 truncate text-left"
+                className="min-w-0 flex-1 truncate text-left text-[13px]"
                 onClick={() => setConvoId(convo.id)}
               >
                 {convo.title ?? "Senza titolo"}
@@ -314,94 +317,40 @@ export function ChatWorkspace() {
         </div>
       </aside>
 
-      {/* Panel 2: chat */}
+      {/* Center: Chat / Agent */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-          <Select
-            value={provider}
-            onValueChange={(value) => {
-              setProvider(value);
-              const first = getProvider(value)?.models[0]?.id;
-              if (first) setModel(first);
-            }}
-          >
-            <SelectTrigger className="h-8 w-[160px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PROVIDERS.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="h-8 w-[180px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(providerInfo?.models ?? []).map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={mode} onValueChange={setMode}>
-            <SelectTrigger className="h-8 w-[110px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MODES.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Badge variant="outline" className="text-xs">
-            runtime: {providerInfo?.runtime ?? "cloud"}
+        <div className="flex items-center gap-2 border-b border-border/80 px-3 py-2 md:px-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Chat / Agent</p>
+          <Badge variant="outline" className="ml-auto font-mono text-[10px]">
+            {agent ? "agent on" : "chat"}
           </Badge>
-
-          <div className="ml-auto flex items-center gap-2">
-            <Label htmlFor="agent-toggle" className="text-xs text-muted-foreground">
-              Agent
-            </Label>
-            <Switch
-              id="agent-toggle"
-              checked={agent}
-              onCheckedChange={(value) => {
-                setAgent(value);
-                if (convoId) void updateConversation(convoId, { agent_enabled: value });
-              }}
-            />
-          </div>
+          {busy && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Loader2 className="size-3 animate-spin text-primary" /> in corso
+            </span>
+          )}
         </div>
 
         {!configured && (
-          <div className="flex items-start gap-2 border-b border-border bg-destructive/10 px-3 py-2 text-xs text-foreground">
+          <div className="flex items-start gap-2 border-b border-border/80 bg-destructive/10 px-3 py-2 text-xs text-foreground">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
             <span>
-              {providerInfo?.label} non è configurato. Aggiungi le credenziali nella pagina Providers:
-              ZAnto.AI non simula risposte.
+              {providerInfo?.label} non è configurato. Aggiungi le credenziali in Providers: ZAnto.AI
+              non simula risposte.
             </span>
           </div>
         )}
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6">
-          <div className="mx-auto max-w-3xl space-y-5">
+          <div className="mx-auto max-w-3xl space-y-4">
             {messages.length === 0 && !streamText && (
-              <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+              <div className="zanto-panel zanto-enter rounded-lg p-6 text-sm text-muted-foreground">
                 <p className="font-display text-base font-semibold text-foreground">
                   Inizia una conversazione
                 </p>
                 <p className="mt-1">
-                  L'agente può leggere e scrivere nel filesystem virtuale del workspace e salvare
-                  note di memoria, usando solo i tool autorizzati.
+                  Scrivi sotto cosa vuoi costruire. Modello e provider si scelgono nella barra del
+                  composer.
                 </p>
               </div>
             )}
@@ -421,62 +370,216 @@ export function ChatWorkspace() {
           </div>
         </div>
 
-        <div className="border-t border-border px-3 py-3 md:px-6">
-          <div className="mx-auto flex max-w-3xl items-end gap-2">
-            <Textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-              placeholder="Scrivi un messaggio…  (Invio per inviare, Shift+Invio per andare a capo)"
-              className="max-h-40 min-h-[52px] flex-1 resize-none"
-            />
-            {busy ? (
-              <Button variant="destructive" className="gap-1.5" onClick={stop}>
-                <Square className="size-4" /> Stop
-              </Button>
-            ) : (
-              <Button className="gap-1.5" onClick={() => void send()} disabled={!input.trim()}>
-                <SendHorizontal className="size-4" /> Invia
-              </Button>
-            )}
+        {/* Composer + control bar (under input, wireframe) */}
+        <div className="zanto-glass border-t border-border/80 px-3 py-3 md:px-5">
+          <div className="mx-auto max-w-3xl space-y-2">
+            <div className="flex items-end gap-2">
+              <Textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void send();
+                  }
+                }}
+                placeholder="＋  Scrivi cosa vuoi costruire…"
+                className="max-h-40 min-h-[56px] flex-1 resize-none border-border/70 bg-background/40 text-sm"
+              />
+              {busy ? (
+                <Button variant="destructive" className="h-10 gap-1.5" onClick={stop}>
+                  <Square className="size-4" /> Stop
+                </Button>
+              ) : (
+                <Button
+                  className="h-10 gap-1.5"
+                  onClick={() => void send()}
+                  disabled={!input.trim()}
+                >
+                  <SendHorizontal className="size-4" /> Invia
+                </Button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Select
+                value={model}
+                onValueChange={setModel}
+                disabled={selectableModels.length === 0}
+              >
+                <SelectTrigger className="h-8 w-[min(100%,11.5rem)] border-border/70 bg-background/30 text-[11px]">
+                  <Bot className="mr-1 size-3 text-primary" />
+                  <SelectValue placeholder="Modello" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectableModels.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={provider}
+                onValueChange={(value) => {
+                  setProvider(value);
+                  const first = getProvider(value)?.models[0]?.id;
+                  if (first) setModel(first);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[min(100%,10.5rem)] border-border/70 bg-background/30 text-[11px]">
+                  <SelectValue placeholder="Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectableProviders.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      {p.label}
+                      {isProviderConfigured(p.id) ? "" : " · non config."}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex h-8 items-center gap-1.5 rounded-md border border-border/70 bg-background/30 px-2">
+                <Label htmlFor="agent-toggle" className="text-[11px] text-muted-foreground">
+                  Agent
+                </Label>
+                <Switch
+                  id="agent-toggle"
+                  checked={agent}
+                  onCheckedChange={(value) => {
+                    setAgent(value);
+                    if (convoId) void updateConversation(convoId, { agent_enabled: value });
+                  }}
+                />
+              </div>
+
+              <Badge variant="secondary" className="h-8 gap-1 font-mono text-[10px]">
+                <Wrench className="size-3" />
+                {allowedTools.length} tools
+              </Badge>
+
+              <Select value={mode} onValueChange={setMode}>
+                <SelectTrigger className="h-8 w-[6.5rem] border-border/70 bg-background/30 text-[11px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODES.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <span className="ml-auto hidden font-mono text-[10px] text-muted-foreground sm:inline">
+                {providerInfo?.runtime ?? "cloud"} · {providerInfo?.label ?? provider}
+              </span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Panel 3: files + activity */}
-      <aside className="hidden w-[22rem] shrink-0 flex-col border-l border-border bg-sidebar xl:flex">
-        <Tabs defaultValue="files" className="flex min-h-0 flex-1 flex-col gap-0">
-          <TabsList className="m-2">
-            <TabsTrigger value="files">File</TabsTrigger>
-            <TabsTrigger value="activity">Attività</TabsTrigger>
+      {/* Right: Activity rail */}
+      <aside className="zanto-glass hidden w-[19rem] shrink-0 flex-col border-l border-border/80 xl:flex">
+        <div className="border-b border-border/80 px-3 py-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Activity
+          </p>
+        </div>
+        <Tabs defaultValue="agent" className="flex min-h-0 flex-1 flex-col gap-0">
+          <TabsList className="mx-2 mt-2 grid h-8 grid-cols-4">
+            <TabsTrigger value="agent" className="text-[10px]">
+              Agent
+            </TabsTrigger>
+            <TabsTrigger value="tools" className="text-[10px]">
+              Tools
+            </TabsTrigger>
+            <TabsTrigger value="files" className="text-[10px]">
+              Files
+            </TabsTrigger>
+            <TabsTrigger value="terminal" className="text-[10px]">
+              Term
+            </TabsTrigger>
           </TabsList>
-          <TabsContent value="files" className="min-h-0 flex-1 overflow-hidden p-2">
-            <FileExplorer workspaceId={workspaceId} compact />
-          </TabsContent>
-          <TabsContent value="activity" className="min-h-0 flex-1 overflow-y-auto p-2">
-            <ul className="space-y-2">
-              {activity.map((row) => (
-                <li key={row.id} className="rounded-md border border-border bg-card p-2 text-xs">
+
+          <TabsContent value="agent" className="min-h-0 flex-1 overflow-y-auto p-2">
+            <div className="zanto-panel mb-2 rounded-md p-2.5 text-xs">
+              <div className="flex items-center gap-2">
+                <span className={agent ? "zanto-online-dot" : "size-2 rounded-full bg-muted-foreground/40"} />
+                <span className="font-medium">{agent ? "Agent attivo" : "Agent spento"}</span>
+              </div>
+              <p className="mt-1 text-muted-foreground">
+                {busy
+                  ? "Esecuzione in corso…"
+                  : agent
+                    ? `Fino a 8 step tool · ${allowedTools.length} tool autorizzati`
+                    : "Modalità chat semplice, nessun tool."}
+              </p>
+            </div>
+            <ul className="space-y-1.5">
+              {tools.map((tool) => (
+                <li
+                  key={tool.id}
+                  className="flex items-center gap-2 rounded-md border border-border/80 bg-card/60 px-2 py-1.5 text-[11px]"
+                >
+                  <Wrench className="size-3 text-primary" />
+                  <span className="font-mono">{tool.name}</span>
+                  <Badge
+                    variant={tool.status === "error" ? "destructive" : "secondary"}
+                    className="ml-auto text-[9px]"
+                  >
+                    {tool.status}
+                  </Badge>
+                </li>
+              ))}
+              {activity.slice(0, 12).map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-md border border-border/70 bg-card/50 p-2 text-[11px]"
+                >
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="outline" className="text-[9px]">
                       {row.kind}
                     </Badge>
                     <span className="text-muted-foreground">
                       {new Date(row.created_at).toLocaleTimeString()}
                     </span>
                   </div>
-                  <p className="mt-1">{row.message}</p>
+                  <p className="mt-1 text-muted-foreground">{row.message}</p>
                 </li>
               ))}
-              {activity.length === 0 && (
-                <li className="p-2 text-xs text-muted-foreground">Nessuna attività registrata.</li>
+              {activity.length === 0 && tools.length === 0 && (
+                <li className="p-2 text-[11px] text-muted-foreground">Nessuna attività.</li>
               )}
             </ul>
+          </TabsContent>
+
+          <TabsContent value="tools" className="min-h-0 flex-1 overflow-y-auto p-2">
+            <ul className="space-y-1">
+              {TOOLS.map((tool) => {
+                const on = allowedTools.includes(tool.name);
+                return (
+                  <li
+                    key={tool.name}
+                    className="flex items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-[11px]"
+                  >
+                    <span className={`size-1.5 rounded-full ${on ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                    <span className="font-mono">{tool.name}</span>
+                    <span className="ml-auto text-muted-foreground">{on ? "on" : "off"}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </TabsContent>
+
+          <TabsContent value="files" className="min-h-0 flex-1 overflow-hidden p-2">
+            <FileExplorer workspaceId={workspaceId} compact />
+          </TabsContent>
+
+          <TabsContent value="terminal" className="min-h-0 flex-1 overflow-y-auto p-3 text-[11px] text-muted-foreground">
+            Terminale di sistema non disponibile in ambiente browser/edge. Nessuna simulazione.
           </TabsContent>
         </Tabs>
       </aside>
@@ -497,10 +600,12 @@ function MessageRow({
 }) {
   const isUser = role === "user";
   return (
-    <div className="flex gap-3">
+    <div className="zanto-enter flex gap-3">
       <span
-        className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-md border border-border ${
-          isUser ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
+        className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-md border border-border/80 ${
+          isUser
+            ? "bg-primary text-primary-foreground shadow-[0_0_12px_var(--zanto-glow)]"
+            : "bg-card text-foreground"
         }`}
       >
         {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
@@ -511,22 +616,26 @@ function MessageRow({
             {parts.map((tool) => (
               <li
                 key={tool.id}
-                className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1 text-xs"
+                className="flex items-center gap-2 rounded-md border border-border/80 bg-card/70 px-2 py-1 text-xs"
               >
-                <Wrench className="size-3 text-muted-foreground" />
+                <Wrench className="size-3 text-primary" />
                 <span className="font-mono">{tool.name}</span>
                 <Badge
                   variant={tool.status === "error" ? "destructive" : "secondary"}
                   className="ml-auto text-[10px]"
                 >
-                  {tool.status === "running" ? "in corso" : tool.status === "done" ? "completato" : "errore"}
+                  {tool.status === "running"
+                    ? "in corso"
+                    : tool.status === "done"
+                      ? "completato"
+                      : "errore"}
                 </Badge>
               </li>
             ))}
           </ul>
         )}
         {isUser ? (
-          <div className="inline-block whitespace-pre-wrap rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">
+          <div className="inline-block whitespace-pre-wrap rounded-lg bg-primary/90 px-3 py-2 text-sm text-primary-foreground">
             {content}
           </div>
         ) : (
@@ -534,7 +643,7 @@ function MessageRow({
             {content}
             {streaming && !content && (
               <span className="inline-flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" /> sto pensando…
+                <Loader2 className="size-3.5 animate-spin text-primary" /> sto pensando…
               </span>
             )}
           </div>
