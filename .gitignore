@@ -7,10 +7,14 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Env / secrets — never commit
-.env
-.env.*
+# Env / secrets — keep private keys out of git.
+# Public Vite/Supabase publishable vars MAY be committed so Lovable builds work.
+.env.local
+.env.*.local
 !.env.example
+
+# Do not commit service-role / secret keys if added later
+.env.secret
 
 node_modules
 dist

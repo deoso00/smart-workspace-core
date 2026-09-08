@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { MODES, PROVIDERS, TOOLS, getProvider } from "@/lib/zanto/catalog";
 import { streamChat, type ToolActivity } from "@/lib/zanto/chat-client";
@@ -31,7 +30,6 @@ import {
   addMessage,
   createConversation,
   deleteConversation,
-  listActivity,
   listConversations,
   listMemory,
   listMessages,
@@ -45,7 +43,7 @@ import { useWorkspace } from "@/lib/zanto/workspace-context";
 import { FileExplorer } from "./FileExplorer";
 
 export function ChatWorkspace() {
-  const { activeId: workspaceId, loading } = useWorkspace();
+  const { activeId: workspaceId, loading, error: workspaceError, retry } = useWorkspace();
   const queryClient = useQueryClient();
 
   const [convoId, setConvoId] = useState<string | null>(null);
@@ -81,12 +79,6 @@ export function ChatWorkspace() {
   const { data: memory = [] } = useQuery({
     queryKey: ["memory", workspaceId],
     queryFn: () => listMemory(workspaceId!),
-    enabled: Boolean(workspaceId),
-  });
-
-  const { data: activity = [] } = useQuery({
-    queryKey: ["activity", workspaceId],
-    queryFn: () => listActivity(workspaceId!, 60),
     enabled: Boolean(workspaceId),
   });
 
@@ -251,7 +243,7 @@ export function ChatWorkspace() {
     }
   };
 
-  if (loading || !workspaceId) {
+  if (loading) {
     return (
       <div className="grid h-full place-items-center text-sm text-muted-foreground">
         <span className="flex items-center gap-2">
@@ -261,53 +253,76 @@ export function ChatWorkspace() {
     );
   }
 
+  if (workspaceError || !workspaceId) {
+    const isSupabase =
+      Boolean(workspaceError?.includes("Supabase")) ||
+      Boolean(workspaceError?.includes("SUPABASE_"));
+    return (
+      <div className="grid h-full place-items-center px-4">
+        <div className="max-w-lg space-y-3 rounded-xl border border-border bg-card p-6 text-center shadow-lg">
+          <AlertTriangle className="mx-auto size-7 text-destructive" />
+          <p className="font-display text-lg font-semibold">Chat non disponibile</p>
+          <p className="text-sm text-muted-foreground">
+            {workspaceError ?? "Nessun workspace attivo."}
+          </p>
+          {isSupabase && (
+            <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-left text-xs text-muted-foreground">
+              Su Lovable: apri il progetto → <strong>Connect Supabase</strong> / Cloud, oppure
+              verifica che esistano{" "}
+              <code className="text-foreground">VITE_SUPABASE_URL</code> e{" "}
+              <code className="text-foreground">VITE_SUPABASE_PUBLISHABLE_KEY</code>, poi fai
+              Publish di nuovo.
+            </p>
+          )}
+          <Button onClick={retry}>Riprova</Button>
+        </div>
+      </div>
+    );
+  }
+
   const selectableProviders = PROVIDERS;
   const selectableModels = providerInfo?.models ?? [];
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Conversations strip */}
-      <aside className="zanto-glass hidden w-[13.5rem] shrink-0 flex-col border-r border-border/80 md:flex">
-        <div className="flex items-center gap-2 border-b border-border/80 px-3 py-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Chat
-          </span>
+    <div className="flex h-full min-h-0 bg-background">
+      {/* LEFT: file tree (Bolt-style workbench) */}
+      <aside className="flex w-[min(100%,17rem)] shrink-0 flex-col border-r border-border bg-card/30 sm:w-64">
+        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Files</span>
           <Button
             size="icon"
             variant="ghost"
-            className="ml-auto size-7"
-            title="Nuova conversazione"
+            className="size-7"
+            title="Nuova chat"
             onClick={() => newConversation.mutate()}
           >
             <Plus className="size-3.5" />
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {conversations.length === 0 && (
-            <p className="px-1 py-2 text-xs text-muted-foreground">
-              Nessuna conversazione: scrivi un messaggio per iniziare.
-            </p>
-          )}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <FileExplorer workspaceId={workspaceId} compact />
+        </div>
+        <div className="max-h-36 shrink-0 overflow-y-auto border-t border-border">
+          <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Chat
+          </p>
           {conversations.map((convo) => (
             <div
               key={convo.id}
-              className={`group mb-0.5 flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                convoId === convo.id
-                  ? "zanto-glow-sm bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "hover:bg-sidebar-accent/40"
+              className={`group flex items-center gap-1 px-2 py-1 text-xs ${
+                convoId === convo.id ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted/50"
               }`}
             >
               <button
                 type="button"
-                className="min-w-0 flex-1 truncate text-left text-[13px]"
+                className="min-w-0 flex-1 truncate text-left"
                 onClick={() => setConvoId(convo.id)}
               >
                 {convo.title ?? "Senza titolo"}
               </button>
               <button
                 type="button"
-                title="Elimina"
-                className="hidden p-1 text-muted-foreground hover:text-destructive group-hover:block"
+                className="hidden p-0.5 hover:text-destructive group-hover:block"
                 onClick={() => void removeConversation(convo.id)}
               >
                 <Trash2 className="size-3" />
@@ -317,44 +332,37 @@ export function ChatWorkspace() {
         </div>
       </aside>
 
-      {/* Center: Chat / Agent */}
+      {/* CENTER: chat + composer with models under */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border/80 px-3 py-2 md:px-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Chat / Agent</p>
-          <Badge variant="outline" className="ml-auto font-mono text-[10px]">
-            {agent ? "agent on" : "chat"}
-          </Badge>
-          {busy && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Loader2 className="size-3 animate-spin text-primary" /> in corso
-            </span>
+        <div className="flex h-10 items-center gap-2 border-b border-border px-4">
+          <span className="text-sm font-medium">Chat</span>
+          {agent && (
+            <Badge variant="secondary" className="text-[10px]">
+              Agent
+            </Badge>
           )}
+          {busy && <Loader2 className="ml-auto size-3.5 animate-spin text-primary" />}
         </div>
 
         {!configured && (
-          <div className="flex items-start gap-2 border-b border-border/80 bg-destructive/10 px-3 py-2 text-xs text-foreground">
+          <div className="flex items-start gap-2 border-b border-border bg-destructive/10 px-4 py-2 text-xs">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
             <span>
-              {providerInfo?.label} non è configurato. Aggiungi le credenziali in Providers: ZAnto.AI
-              non simula risposte.
+              {providerInfo?.label} non configurato — apri Providers e inserisci la API key.
             </span>
           </div>
         )}
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6">
-          <div className="mx-auto max-w-3xl space-y-4">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+          <div className="mx-auto max-w-2xl space-y-4">
             {messages.length === 0 && !streamText && (
-              <div className="zanto-panel zanto-enter rounded-lg p-6 text-sm text-muted-foreground">
+              <div className="rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm text-muted-foreground">
                 <p className="font-display text-base font-semibold text-foreground">
-                  Inizia una conversazione
+                  Cosa vuoi costruire?
                 </p>
-                <p className="mt-1">
-                  Scrivi sotto cosa vuoi costruire. Modello e provider si scelgono nella barra del
-                  composer.
-                </p>
+                <p className="mt-1">Scrivi sotto. I file del progetto sono a sinistra.</p>
               </div>
             )}
-
             {messages.map((message) => (
               <MessageRow
                 key={message.id}
@@ -363,17 +371,15 @@ export function ChatWorkspace() {
                 parts={(message.parts as unknown as ToolActivity[]) ?? []}
               />
             ))}
-
             {(streamText || busy) && (
               <MessageRow role="assistant" content={streamText} parts={tools} streaming={busy} />
             )}
           </div>
         </div>
 
-        {/* Composer + control bar (under input, wireframe) */}
-        <div className="zanto-glass border-t border-border/80 px-3 py-3 md:px-5">
-          <div className="mx-auto max-w-3xl space-y-2">
-            <div className="flex items-end gap-2">
+        <div className="border-t border-border bg-card/40 px-4 py-3">
+          <div className="mx-auto max-w-2xl space-y-2">
+            <div className="flex items-end gap-2 rounded-xl border border-border bg-background p-2 shadow-sm">
               <Textarea
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
@@ -383,32 +389,34 @@ export function ChatWorkspace() {
                     void send();
                   }
                 }}
-                placeholder="＋  Scrivi cosa vuoi costruire…"
-                className="max-h-40 min-h-[56px] flex-1 resize-none border-border/70 bg-background/40 text-sm"
+                placeholder="Scrivi cosa vuoi costruire…"
+                className="max-h-36 min-h-[48px] flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
               />
               {busy ? (
-                <Button variant="destructive" className="h-10 gap-1.5" onClick={stop}>
-                  <Square className="size-4" /> Stop
+                <Button variant="destructive" size="icon" className="size-9 shrink-0" onClick={stop}>
+                  <Square className="size-4" />
                 </Button>
               ) : (
                 <Button
-                  className="h-10 gap-1.5"
+                  size="icon"
+                  className="size-9 shrink-0"
                   onClick={() => void send()}
                   disabled={!input.trim()}
                 >
-                  <SendHorizontal className="size-4" /> Invia
+                  <SendHorizontal className="size-4" />
                 </Button>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Model / provider under chat — real catalog only */}
+            <div className="flex flex-wrap items-center gap-1.5 px-0.5">
               <Select
                 value={model}
                 onValueChange={setModel}
                 disabled={selectableModels.length === 0}
               >
-                <SelectTrigger className="h-8 w-[min(100%,11.5rem)] border-border/70 bg-background/30 text-[11px]">
-                  <Bot className="mr-1 size-3 text-primary" />
+                <SelectTrigger className="h-7 w-auto min-w-[9rem] gap-1 border-0 bg-transparent px-2 text-[11px] shadow-none">
+                  <Bot className="size-3 text-primary" />
                   <SelectValue placeholder="Modello" />
                 </SelectTrigger>
                 <SelectContent>
@@ -428,20 +436,20 @@ export function ChatWorkspace() {
                   if (first) setModel(first);
                 }}
               >
-                <SelectTrigger className="h-8 w-[min(100%,10.5rem)] border-border/70 bg-background/30 text-[11px]">
+                <SelectTrigger className="h-7 w-auto min-w-[8rem] border-0 bg-transparent px-2 text-[11px] shadow-none">
                   <SelectValue placeholder="Provider" />
                 </SelectTrigger>
                 <SelectContent>
                   {selectableProviders.map((p) => (
                     <SelectItem key={p.id} value={p.id} className="text-xs">
                       {p.label}
-                      {isProviderConfigured(p.id) ? "" : " · non config."}
+                      {isProviderConfigured(p.id) ? "" : " · setup"}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              <div className="flex h-8 items-center gap-1.5 rounded-md border border-border/70 bg-background/30 px-2">
+              <div className="flex h-7 items-center gap-1.5 px-1">
                 <Label htmlFor="agent-toggle" className="text-[11px] text-muted-foreground">
                   Agent
                 </Label>
@@ -455,13 +463,8 @@ export function ChatWorkspace() {
                 />
               </div>
 
-              <Badge variant="secondary" className="h-8 gap-1 font-mono text-[10px]">
-                <Wrench className="size-3" />
-                {allowedTools.length} tools
-              </Badge>
-
               <Select value={mode} onValueChange={setMode}>
-                <SelectTrigger className="h-8 w-[6.5rem] border-border/70 bg-background/30 text-[11px]">
+                <SelectTrigger className="h-7 w-[5.5rem] border-0 bg-transparent px-2 text-[11px] shadow-none">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -473,116 +476,13 @@ export function ChatWorkspace() {
                 </SelectContent>
               </Select>
 
-              <span className="ml-auto hidden font-mono text-[10px] text-muted-foreground sm:inline">
-                {providerInfo?.runtime ?? "cloud"} · {providerInfo?.label ?? provider}
+              <span className="ml-auto hidden text-[10px] text-muted-foreground sm:inline">
+                {allowedTools.length} tools
               </span>
             </div>
           </div>
         </div>
       </section>
-
-      {/* Right: Activity rail */}
-      <aside className="zanto-glass hidden w-[19rem] shrink-0 flex-col border-l border-border/80 xl:flex">
-        <div className="border-b border-border/80 px-3 py-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Activity
-          </p>
-        </div>
-        <Tabs defaultValue="agent" className="flex min-h-0 flex-1 flex-col gap-0">
-          <TabsList className="mx-2 mt-2 grid h-8 grid-cols-4">
-            <TabsTrigger value="agent" className="text-[10px]">
-              Agent
-            </TabsTrigger>
-            <TabsTrigger value="tools" className="text-[10px]">
-              Tools
-            </TabsTrigger>
-            <TabsTrigger value="files" className="text-[10px]">
-              Files
-            </TabsTrigger>
-            <TabsTrigger value="terminal" className="text-[10px]">
-              Term
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="agent" className="min-h-0 flex-1 overflow-y-auto p-2">
-            <div className="zanto-panel mb-2 rounded-md p-2.5 text-xs">
-              <div className="flex items-center gap-2">
-                <span className={agent ? "zanto-online-dot" : "size-2 rounded-full bg-muted-foreground/40"} />
-                <span className="font-medium">{agent ? "Agent attivo" : "Agent spento"}</span>
-              </div>
-              <p className="mt-1 text-muted-foreground">
-                {busy
-                  ? "Esecuzione in corso…"
-                  : agent
-                    ? `Fino a 8 step tool · ${allowedTools.length} tool autorizzati`
-                    : "Modalità chat semplice, nessun tool."}
-              </p>
-            </div>
-            <ul className="space-y-1.5">
-              {tools.map((tool) => (
-                <li
-                  key={tool.id}
-                  className="flex items-center gap-2 rounded-md border border-border/80 bg-card/60 px-2 py-1.5 text-[11px]"
-                >
-                  <Wrench className="size-3 text-primary" />
-                  <span className="font-mono">{tool.name}</span>
-                  <Badge
-                    variant={tool.status === "error" ? "destructive" : "secondary"}
-                    className="ml-auto text-[9px]"
-                  >
-                    {tool.status}
-                  </Badge>
-                </li>
-              ))}
-              {activity.slice(0, 12).map((row) => (
-                <li
-                  key={row.id}
-                  className="rounded-md border border-border/70 bg-card/50 p-2 text-[11px]"
-                >
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[9px]">
-                      {row.kind}
-                    </Badge>
-                    <span className="text-muted-foreground">
-                      {new Date(row.created_at).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-muted-foreground">{row.message}</p>
-                </li>
-              ))}
-              {activity.length === 0 && tools.length === 0 && (
-                <li className="p-2 text-[11px] text-muted-foreground">Nessuna attività.</li>
-              )}
-            </ul>
-          </TabsContent>
-
-          <TabsContent value="tools" className="min-h-0 flex-1 overflow-y-auto p-2">
-            <ul className="space-y-1">
-              {TOOLS.map((tool) => {
-                const on = allowedTools.includes(tool.name);
-                return (
-                  <li
-                    key={tool.name}
-                    className="flex items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-[11px]"
-                  >
-                    <span className={`size-1.5 rounded-full ${on ? "bg-primary" : "bg-muted-foreground/30"}`} />
-                    <span className="font-mono">{tool.name}</span>
-                    <span className="ml-auto text-muted-foreground">{on ? "on" : "off"}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </TabsContent>
-
-          <TabsContent value="files" className="min-h-0 flex-1 overflow-hidden p-2">
-            <FileExplorer workspaceId={workspaceId} compact />
-          </TabsContent>
-
-          <TabsContent value="terminal" className="min-h-0 flex-1 overflow-y-auto p-3 text-[11px] text-muted-foreground">
-            Terminale di sistema non disponibile in ambiente browser/edge. Nessuna simulazione.
-          </TabsContent>
-        </Tabs>
-      </aside>
     </div>
   );
 }
@@ -600,42 +500,33 @@ function MessageRow({
 }) {
   const isUser = role === "user";
   return (
-    <div className="zanto-enter flex gap-3">
+    <div className="flex gap-3">
       <span
-        className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-md border border-border/80 ${
-          isUser
-            ? "bg-primary text-primary-foreground shadow-[0_0_12px_var(--zanto-glow)]"
-            : "bg-card text-foreground"
+        className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[11px] ${
+          isUser ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
         }`}
       >
         {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 pt-0.5">
         {parts.length > 0 && (
           <ul className="mb-2 space-y-1">
             {parts.map((tool) => (
               <li
                 key={tool.id}
-                className="flex items-center gap-2 rounded-md border border-border/80 bg-card/70 px-2 py-1 text-xs"
+                className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-xs"
               >
-                <Wrench className="size-3 text-primary" />
+                <Wrench className="size-3 text-muted-foreground" />
                 <span className="font-mono">{tool.name}</span>
-                <Badge
-                  variant={tool.status === "error" ? "destructive" : "secondary"}
-                  className="ml-auto text-[10px]"
-                >
-                  {tool.status === "running"
-                    ? "in corso"
-                    : tool.status === "done"
-                      ? "completato"
-                      : "errore"}
+                <Badge variant="secondary" className="ml-auto text-[10px]">
+                  {tool.status}
                 </Badge>
               </li>
             ))}
           </ul>
         )}
         {isUser ? (
-          <div className="inline-block whitespace-pre-wrap rounded-lg bg-primary/90 px-3 py-2 text-sm text-primary-foreground">
+          <div className="inline-block whitespace-pre-wrap rounded-2xl bg-primary px-3.5 py-2 text-sm text-primary-foreground">
             {content}
           </div>
         ) : (
@@ -643,7 +534,7 @@ function MessageRow({
             {content}
             {streaming && !content && (
               <span className="inline-flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin text-primary" /> sto pensando…
+                <Loader2 className="size-3.5 animate-spin" /> sto pensando…
               </span>
             )}
           </div>
