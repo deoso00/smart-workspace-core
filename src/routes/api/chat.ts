@@ -135,7 +135,10 @@ export const Route = createFileRoute("/api/chat")({
                 if (found.data) {
                   parentId = found.data.id;
                 } else {
-                  const created = await supabase
+                  const created: {
+                    data: { id: string } | null;
+                    error: { message: string } | null;
+                  } = await supabase
                     .from("vfs_nodes")
                     .insert({
                       workspace_id: workspaceId,
@@ -147,7 +150,9 @@ export const Route = createFileRoute("/api/chat")({
                     })
                     .select("id")
                     .single();
-                  if (created.error) return { error: created.error.message };
+                  if (created.error || !created.data) {
+                    return { error: created.error?.message ?? "insert folder failed" };
+                  }
                   parentId = created.data.id;
                 }
               }
