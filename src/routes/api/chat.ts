@@ -1,11 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { streamText, tool, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
-import {
-  createByoProvider,
-  createGeminiProvider,
-  createLovableAiGatewayProvider,
-} from "@/lib/ai-gateway.server";
+import { createByoProvider, createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { createServerSupabase } from "@/lib/zanto/server-db.server";
 
 type ChatBody = {
@@ -26,15 +22,16 @@ const BYO_BASE_URLS: Record<string, string> = {
   groq: "https://api.groq.com/openai/v1",
 };
 
-const DEFAULT_PROVIDER = "google";
-const DEFAULT_MODEL = "gemini-3.7-flash";
+const DEFAULT_PROVIDER = "lovable";
+const DEFAULT_MODEL = "google/gemini-3.7-flash";
+/** Cap agent tool loops to limit Lovable AI Gateway credit burn. */
 const AGENT_MAX_STEPS = 8;
 
 function jsonLine(payload: unknown) {
   return new TextEncoder().encode(`${JSON.stringify(payload)}\n`);
 }
 
-/** Map provider errors to clear Italian messages without leaking secrets. */
+/** Clear provider errors without leaking secrets. */
 function formatChatError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   const lower = raw.toLowerCase();
@@ -46,14 +43,10 @@ function formatChatError(error: unknown): string {
         : undefined;
 
   if (status === 429 || /\b429\b/.test(raw) || lower.includes("rate limit") || lower.includes("resource_exhausted")) {
-    return "Limite di richieste Gemini raggiunto (rate limit 429). Riprova tra poco.";
+    return "Limite di richieste raggiunto (rate limit 429). Riprova tra poco.";
   }
-  if (status === 401 || status === 403 || lower.includes("api key") || lower.includes("unauthenticated")) {
-    return "Autenticazione Gemini non valida. Verifica GEMINI_API_KEY nel deployment.";
-  }
-  // Never forward Lovable credit wording as if it were a Gemini failure.
-  if (lower.includes("no credit") || lower.includes("payment required") || status === 402) {
-    return "Il provider selezionato ha rifiutato la richiesta (crediti/pagamento). Usa Google Gemini con GEMINI_API_KEY.";
+  if (status === 402 || lower.includes("no credit") || lower.includes("payment required")) {
+    return "Crediti AI Gateway Lovable esauriti. Aggiungi crediti in Settings → Plans & credit usage.";
   }
   return raw;
 }
@@ -73,16 +66,7 @@ export const Route = createFileRoute("/api/chat")({
 
         let model;
         try {
-          if (providerId === "google") {
-            const key = process.env["GEMINI_API_KEY"];
-            if (!key) {
-              return new Response(
-                JSON.stringify({ error: "Gemini non configurato: manca GEMINI_API_KEY." }),
-                { status: 500, headers: { "content-type": "application/json" } },
-              );
-            }
-            model = createGeminiProvider(key)(modelId);
-          } else if (providerId === "lovable") {
+          if (providerId === "lovable") {
             const key = process.env["LOVABLE_API_KEY"];
             if (!key) {
               return new Response(

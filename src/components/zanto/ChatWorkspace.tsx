@@ -49,8 +49,8 @@ export function ChatWorkspace() {
   const queryClient = useQueryClient();
 
   const [convoId, setConvoId] = useState<string | null>(null);
-  const [provider, setProvider] = useState("google");
-  const [model, setModel] = useState("gemini-3.7-flash");
+  const [provider, setProvider] = useState("lovable");
+  const [model, setModel] = useState("google/gemini-3.7-flash");
   const [mode, setMode] = useState("AUTO");
   const [agent, setAgent] = useState(true);
   const [input, setInput] = useState("");

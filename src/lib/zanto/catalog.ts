@@ -18,7 +18,7 @@ export type ModelInfo = {
 export type ProviderInfo = {
   id: string;
   label: string;
-  /** True when the server authenticates the provider via env (no user key in the browser). */
+  /** True only for providers Lovable AI already authenticates server-side. */
   builtInKey: boolean;
   runtime: RuntimeId;
   docs?: string;
@@ -29,26 +29,13 @@ export type ProviderInfo = {
 
 export const PROVIDERS: ProviderInfo[] = [
   {
-    id: "google",
-    label: "Google Gemini",
-    builtInKey: true,
-    runtime: "cloud",
-    docs: "https://aistudio.google.com/apikey",
-    description:
-      "API Gemini ufficiale (server-side). Usa GEMINI_API_KEY nel deployment; nessuna chiave nel browser.",
-    models: [
-      { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Veloce, ottimo default" },
-    ],
-  },
-  {
     id: "lovable",
     label: "Lovable AI",
     builtInKey: true,
     runtime: "cloud",
-    description:
-      "Gateway opzionale Lovable: fatturato sui crediti AI Gateway del progetto. Non richiesto per ZAnto.",
+    description: "Gateway integrato: nessuna chiave richiesta, fatturato sui crediti del progetto.",
     models: [
-      { id: "google/gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Via Lovable Gateway" },
+      { id: "google/gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Veloce, ottimo default" },
       { id: "google/gemini-3.6-flash", label: "Gemini 3.6 Flash", note: "Efficiente" },
       {
         id: "google/gemini-3.1-pro-preview",
