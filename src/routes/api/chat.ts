@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { streamText, tool, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
-import { createByoProvider, createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import {
+  createByoProvider,
+  createGeminiProvider,
+  createLovableAiGatewayProvider,
+} from "@/lib/ai-gateway.server";
 import { createServerSupabase } from "@/lib/zanto/server-db.server";
 
 type ChatBody = {
@@ -20,11 +24,38 @@ type ChatBody = {
 const BYO_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   groq: "https://api.groq.com/openai/v1",
-  google: "https://generativelanguage.googleapis.com/v1beta/openai/",
 };
+
+const DEFAULT_PROVIDER = "google";
+const DEFAULT_MODEL = "gemini-3.7-flash";
+const AGENT_MAX_STEPS = 8;
 
 function jsonLine(payload: unknown) {
   return new TextEncoder().encode(`${JSON.stringify(payload)}\n`);
+}
+
+/** Map provider errors to clear Italian messages without leaking secrets. */
+function formatChatError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const lower = raw.toLowerCase();
+  const status =
+    typeof (error as { statusCode?: unknown })?.statusCode === "number"
+      ? (error as { statusCode: number }).statusCode
+      : typeof (error as { status?: unknown })?.status === "number"
+        ? (error as { status: number }).status
+        : undefined;
+
+  if (status === 429 || /\b429\b/.test(raw) || lower.includes("rate limit") || lower.includes("resource_exhausted")) {
+    return "Limite di richieste Gemini raggiunto (rate limit 429). Riprova tra poco.";
+  }
+  if (status === 401 || status === 403 || lower.includes("api key") || lower.includes("unauthenticated")) {
+    return "Autenticazione Gemini non valida. Verifica GEMINI_API_KEY nel deployment.";
+  }
+  // Never forward Lovable credit wording as if it were a Gemini failure.
+  if (lower.includes("no credit") || lower.includes("payment required") || status === 402) {
+    return "Il provider selezionato ha rifiutato la richiesta (crediti/pagamento). Usa Google Gemini con GEMINI_API_KEY.";
+  }
+  return raw;
 }
 
 export const Route = createFileRoute("/api/chat")({
@@ -37,8 +68,8 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Nessun messaggio", { status: 400 });
         }
 
-        const providerId = body.provider ?? "google";
-        const modelId = body.model ?? "gemini-3.7-flash";
+        const providerId = body.provider ?? DEFAULT_PROVIDER;
+        const modelId = body.model ?? DEFAULT_MODEL;
 
         let model;
         try {
@@ -46,12 +77,11 @@ export const Route = createFileRoute("/api/chat")({
             const key = process.env["GEMINI_API_KEY"];
             if (!key) {
               return new Response(
-                JSON.stringify({ error: "Google Gemini non configurato: GEMINI_API_KEY assente su questo progetto." }),
+                JSON.stringify({ error: "Gemini non configurato: manca GEMINI_API_KEY." }),
                 { status: 500, headers: { "content-type": "application/json" } },
               );
             }
-            const googleModelId = modelId.replace(/^google\//, "");
-            model = createByoProvider("google", BYO_BASE_URLS.google!, key)(googleModelId);
+            model = createGeminiProvider(key)(modelId);
           } else if (providerId === "lovable") {
             const key = process.env["LOVABLE_API_KEY"];
             if (!key) {
@@ -84,7 +114,7 @@ export const Route = createFileRoute("/api/chat")({
             model = createByoProvider(providerId, base, apiKey)(modelId);
           }
         } catch (error) {
-          return new Response(JSON.stringify({ error: String(error) }), {
+          return new Response(JSON.stringify({ error: formatChatError(error) }), {
             status: 500,
             headers: { "content-type": "application/json" },
           });
@@ -265,7 +295,8 @@ export const Route = createFileRoute("/api/chat")({
                 model,
                 system,
                 messages: modelMessages,
-                ...(useAgent ? { tools, stopWhen: stepCountIs(50) } : {}),
+                maxRetries: 1,
+                ...(useAgent ? { tools, stopWhen: stepCountIs(AGENT_MAX_STEPS) } : {}),
                 abortSignal: request.signal,
               });
 
@@ -294,15 +325,14 @@ export const Route = createFileRoute("/api/chat")({
                     }),
                   );
                 } else if (part.type === "error") {
-                  controller.enqueue(jsonLine({ t: "error", v: String(part.error) }));
+                  controller.enqueue(jsonLine({ t: "error", v: formatChatError(part.error) }));
                 }
               }
               controller.enqueue(jsonLine({ t: "done" }));
               close();
             } catch (error) {
-              const message = error instanceof Error ? error.message : String(error);
               if (!request.signal.aborted) {
-                controller.enqueue(jsonLine({ t: "error", v: message }));
+                controller.enqueue(jsonLine({ t: "error", v: formatChatError(error) }));
               }
               close();
             }
