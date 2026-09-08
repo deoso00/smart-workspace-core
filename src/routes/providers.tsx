@@ -70,7 +70,7 @@ function ProvidersPage() {
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{provider.description}</p>
 
-              {!provider.builtInKey && (
+              {(!provider.builtInKey || Boolean(provider.keyLabel)) && (
                 <CredentialForm
                   key={`${provider.id}-${tick}`}
                   providerId={provider.id}
@@ -78,6 +78,14 @@ function ProvidersPage() {
                   local={provider.runtime === "local"}
                   onSaved={() => setTick((value) => value + 1)}
                 />
+              )}
+
+              {provider.builtInKey && provider.id === "openrouter" && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Su Lovable/Vercel: metti <code className="font-mono">OPENROUTER_API_KEY</code> nel{" "}
+                  <code className="font-mono">.env</code> (chiave gratis su openrouter.ai/keys). Qui sotto
+                  puoi anche incollarla solo in questo browser.
+                </p>
               )}
 
               {provider.runtime === "local" && (

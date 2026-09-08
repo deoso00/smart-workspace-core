@@ -47,19 +47,19 @@ export const PROVIDERS: ProviderInfo[] = [
     builtInKey: true,
     runtime: "cloud",
     description:
-      "Gateway Lovable opzionale: usa i crediti AI Gateway del progetto. Non necessario se usi Google Gemini.",
+      "Modelli veloci via Lovable (crediti AI Gateway / Run). Consigliato: Agent OFF + Flash Lite per consumare poco. Non confondere con i crediti Build della chat editor.",
     models: [
-      { id: "google/gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Via Lovable Gateway" },
+      {
+        id: "google/gemini-3.1-flash-lite",
+        label: "Gemini 3.1 Flash Lite",
+        note: "Default — veloce e parco di crediti",
+      },
+      { id: "google/gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Più forte, costa di più" },
       { id: "google/gemini-3.6-flash", label: "Gemini 3.6 Flash", note: "Efficiente" },
       {
         id: "google/gemini-3.1-pro-preview",
         label: "Gemini 3.1 Pro",
-        note: "Ragionamento più forte",
-      },
-      {
-        id: "google/gemini-3.1-flash-lite",
-        label: "Gemini 3.1 Flash Lite",
-        note: "Alto volume, economico",
+        note: "Ragionamento — brucia crediti",
       },
       { id: "openai/gpt-5.4", label: "GPT-5.4", note: "Frontier reasoning" },
       { id: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini", note: "Bilanciato" },
@@ -95,12 +95,13 @@ export const PROVIDERS: ProviderInfo[] = [
   {
     id: "openrouter",
     label: "OpenRouter (gratis)",
-    builtInKey: false,
+    /** Server usa OPENROUTER_API_KEY su Lovable/Vercel; in Providers puoi comunque incollare una chiave. */
+    builtInKey: true,
     runtime: "cloud",
-    keyLabel: "OpenRouter API key (sk-or-...)",
+    keyLabel: "OpenRouter API key (sk-or-...) — opzionale se già in .env",
     docs: "https://openrouter.ai/keys",
     description:
-      "Gateway gratuito con modelli cloud forti per codice. Limite tipico ~50 req/giorno senza crediti pagati.",
+      "Gratis (modelli :free). Su Lovable metti OPENROUTER_API_KEY nel .env. Limite tipico ~50 req/giorno.",
     models: [
       {
         id: "poolside/laguna-s-2.1:free",

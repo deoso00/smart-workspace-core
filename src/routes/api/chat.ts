@@ -42,6 +42,10 @@ const BYO_BASE_URLS: Record<string, string> = {
 const DEFAULT_PROVIDER = "google";
 const DEFAULT_MODEL = "gemini-3.7-flash";
 const AGENT_MAX_STEPS = 8;
+/** Lovable AI Gateway bills per call+tokens: keep Agent short and chats lean. */
+const LOVABLE_AGENT_MAX_STEPS = 4;
+const LOVABLE_MAX_OUTPUT_TOKENS = 2048;
+const LOVABLE_HISTORY_LIMIT = 12;
 
 function jsonLine(payload: unknown) {
   return new TextEncoder().encode(`${JSON.stringify(payload)}\n`);
@@ -85,7 +89,7 @@ function formatChatError(error: unknown): string {
     return "Chiave API non valida. Controlla Providers (Gemini / OpenRouter / Groq).";
   }
   if (status === 402 || detail.includes("no credit") || detail.includes("payment required") || detail.includes("insufficient")) {
-    return "Crediti esauriti sul provider. Prova OpenRouter free, Gemini o Ollama locale.";
+    return "Crediti Lovable AI Gateway esauriti. In ZAnto: Agent OFF + Flash Lite, oppure passa a Gemini diretto / OpenRouter / Ollama. I crediti Build (chat editor Lovable) sono un altro bilancio.";
   }
   if (detail.includes("provider returned error") || detail.includes("failed after")) {
     return "OpenRouter/provider ha rifiutato la richiesta Agent (spesso modello free saturo o tool call fallita). Riprova, oppure passa a North Mini Code / Gemini.";
@@ -143,6 +147,19 @@ export const Route = createFileRoute("/api/chat")({
           } else if (providerId === "ollama") {
             const base = body.credential?.baseUrl?.trim() || "http://localhost:11434";
             model = createByoProvider("ollama", `${base.replace(/\/$/, "")}/v1`)(modelId);
+          } else if (providerId === "openrouter") {
+            const apiKey =
+              body.credential?.apiKey?.trim() || process.env["OPENROUTER_API_KEY"]?.trim();
+            if (!apiKey) {
+              return new Response(
+                JSON.stringify({
+                  error:
+                    "OpenRouter: manca la chiave. Aggiungi OPENROUTER_API_KEY nel .env (Lovable/Vercel) oppure incollala in Providers. Chiave gratis su https://openrouter.ai/keys",
+                }),
+                { status: 400, headers: { "content-type": "application/json" } },
+              );
+            }
+            model = createByoProvider("openrouter", BYO_BASE_URLS.openrouter, apiKey)(modelId);
           } else {
             const apiKey = body.credential?.apiKey;
             const base = BYO_BASE_URLS[providerId];
@@ -402,11 +419,23 @@ export const Route = createFileRoute("/api/chat")({
           Object.entries(allTools).filter(([name]) => allowed.has(name)),
         );
         const useAgent = Boolean(body.agent) && Object.keys(tools).length > 0;
+        const isLovable = providerId === "lovable";
+        const agentStepLimit = isLovable ? LOVABLE_AGENT_MAX_STEPS : AGENT_MAX_STEPS;
+        const historyMessages = isLovable ? messages.slice(-LOVABLE_HISTORY_LIMIT) : messages;
+        const memorySnippet =
+          body.memory && isLovable
+            ? body.memory.slice(0, 1200)
+            : body.memory
+              ? body.memory
+              : "";
 
         const system = [
           "Sei ZAnto.AI, un assistente AI personale che lavora dentro un workspace con filesystem virtuale.",
           "Rispondi in italiano se l'utente scrive in italiano. Sii concreto e onesto: non inventare risultati di strumenti.",
           "VIETATO disegnare in ASCII art, emoji-art o fingere un'immagine in testo. Non sei un generatore di immagini in chat.",
+          isLovable
+            ? "Risposte brevi e utili: evita ripetizioni e lunghi riassunti inutili (risparmio crediti gateway)."
+            : "",
           useAgent
             ? [
                 "Modalità Agent attiva: hai strumenti reali (vfs_list, vfs_read, vfs_write, memory_save, memory_list, media_generate_image, media_generate_video).",
@@ -414,14 +443,19 @@ export const Route = createFileRoute("/api/chat")({
                 "Se l'utente chiede un'immagine, un disegno, un logo, una foto o una illustrazione: CHIAMA subito media_generate_image con il prompt. Non scrivere ASCII, non descrivere pixel, non dire 'ecco il disegno'.",
                 "Per video: media_generate_video (richiede billing Google). Se fallisce, dillo chiaramente.",
                 "Percorsi assoluti che iniziano con / (es. /index.html). Dopo il tool, conferma breve con il path scritto.",
-              ].join(" ")
+                isLovable
+                  ? "Su Lovable: massimo pochi tool call; preferisci 1–2 scritture mirate invece di molti round-trip."
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")
             : "Modalità chat semplice: nessuno strumento. Se chiede un'immagine, digli di usare Media Studio sotto il composer (Genera immagine) oppure di attivare Agent.",
-          body.memory ? `Memoria del workspace:\n${body.memory}` : "",
+          memorySnippet ? `Memoria del workspace:\n${memorySnippet}` : "",
         ]
           .filter(Boolean)
           .join("\n");
 
-        const modelMessages: ModelMessage[] = messages.map((m) => ({
+        const modelMessages: ModelMessage[] = historyMessages.map((m) => ({
           role: m.role,
           content: m.content,
         })) as ModelMessage[];
@@ -445,8 +479,10 @@ export const Route = createFileRoute("/api/chat")({
                 model,
                 system,
                 messages: modelMessages,
-                maxRetries: 1,
-                ...(useAgent ? { tools, stopWhen: stepCountIs(AGENT_MAX_STEPS) } : {}),
+                // Lovable: no retry double-billing on transient errors
+                maxRetries: isLovable ? 0 : 1,
+                ...(isLovable ? { maxOutputTokens: LOVABLE_MAX_OUTPUT_TOKENS } : {}),
+                ...(useAgent ? { tools, stopWhen: stepCountIs(agentStepLimit) } : {}),
                 abortSignal: signal,
               });
 

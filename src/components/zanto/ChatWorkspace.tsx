@@ -51,8 +51,19 @@ export function ChatWorkspace() {
   const desktop =
     import.meta.env.VITE_ZANTO_DESKTOP === "1" ||
     (typeof window !== "undefined" && Boolean((window as { zantoDesktop?: unknown }).zantoDesktop));
-  const [provider, setProvider] = useState(desktop ? "ollama" : "google");
-  const [model, setModel] = useState(desktop ? "llama3.2:1b" : "gemini-3.7-flash");
+  const onLovableHost =
+    typeof window !== "undefined" &&
+    /\.(lovable\.app|lovableproject\.com|lovableproject-dev\.com)$/i.test(window.location.hostname);
+  const [provider, setProvider] = useState(
+    desktop ? "ollama" : onLovableHost ? "openrouter" : "google",
+  );
+  const [model, setModel] = useState(
+    desktop
+      ? "llama3.2:1b"
+      : onLovableHost
+        ? "poolside/laguna-s-2.1:free"
+        : "gemini-3.7-flash",
+  );
   const [mode, setMode] = useState(desktop ? "LOCAL" : "AUTO");
   const [agent, setAgent] = useState(false);
 
@@ -475,11 +486,20 @@ export function ChatWorkspace() {
                   id="agent-toggle"
                   checked={agent}
                   onCheckedChange={(value) => {
+                    if (value && provider === "lovable") {
+                      toast.message("Agent su Lovable brucia crediti Run (fino a 4 step a messaggio). Usalo solo per i file.");
+                    }
                     setAgent(value);
                     if (convoId) void updateConversation(convoId, { agent_enabled: value });
                   }}
                 />
               </div>
+
+              {provider === "lovable" && (
+                <span className="hidden max-w-[11rem] truncate text-[10px] text-muted-foreground sm:inline">
+                  {agent ? "Agent=più crediti" : "Chat=1 call · meno crediti"}
+                </span>
+              )}
 
               <Select value={mode} onValueChange={setMode}>
                 <SelectTrigger className="h-7 w-[5.5rem] border-0 bg-transparent px-2 text-[11px] shadow-none">

@@ -24,7 +24,10 @@ export function createLovableAiGatewayProvider(apiKey: string) {
 export function createByoProvider(name: string, baseURL: string, apiKey?: string) {
   const headers: Record<string, string> = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   if (name === "openrouter") {
-    headers["HTTP-Referer"] = "http://localhost:8080";
+    headers["HTTP-Referer"] =
+      process.env["OPENROUTER_HTTP_REFERER"]?.trim() ||
+      process.env["VITE_APP_URL"]?.trim() ||
+      "https://github.com/deoso00/smart-workspace-core";
     headers["X-Title"] = "ZAnto.AI";
   }
   return createOpenAICompatible({
