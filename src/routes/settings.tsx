@@ -22,7 +22,15 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const { theme, toggle } = useTheme();
-  const [name, setName] = useState(() => getGuestName());
+  const [name, setName] = useState("");
+  const [guestKey, setGuestKey] = useState("");
+
+  // Client-only: the guest identity lives in this browser, so read it after mount
+  // to keep the server-rendered HTML identical.
+  useEffect(() => {
+    setName(getGuestName());
+    setGuestKey(getGuestKey());
+  }, []);
 
   return (
     <PageShell title="Settings" description="Nessun login richiesto: l'identità guest resta in questo browser.">
