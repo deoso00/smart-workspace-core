@@ -31,11 +31,12 @@ export const PROVIDERS: ProviderInfo[] = [
   {
     id: "google",
     label: "Google Gemini",
-    builtInKey: true,
+    builtInKey: false,
     runtime: "cloud",
+    keyLabel: "Gemini API key (AIza...)",
     docs: "https://aistudio.google.com/apikey",
     description:
-      "Gemini diretto con GEMINI_API_KEY sul server. Lovable ospita l'app; non consuma crediti AI Gateway.",
+      "Incolla la tua chiave Gemini qui: resta in questo browser. Le chiamate vanno a Google (non consumano crediti AI Gateway Lovable).",
     models: [
       { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Default — fatturato su Google" },
     ],

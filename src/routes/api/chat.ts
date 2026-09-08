@@ -49,10 +49,10 @@ function formatChatError(error: unknown): string {
     return "Limite di richieste Gemini raggiunto (rate limit 429). Riprova tra poco.";
   }
   if (status === 401 || status === 403 || lower.includes("api key not valid") || lower.includes("unauthenticated")) {
-    return "Chiave Gemini non valida. Verifica GEMINI_API_KEY nei secret del progetto.";
+    return "Chiave Gemini non valida. Controlla la key in Providers → Google Gemini.";
   }
   if (status === 402 || lower.includes("no credit") || lower.includes("payment required")) {
-    return "Crediti AI Gateway Lovable esauriti. Usa il provider Google Gemini (GEMINI_API_KEY) oppure ricarica i crediti Lovable.";
+    return "Crediti AI Gateway Lovable esauriti. Usa Google Gemini con la tua key in Providers.";
   }
   return raw;
 }
@@ -73,11 +73,14 @@ export const Route = createFileRoute("/api/chat")({
         let model;
         try {
           if (providerId === "google") {
-            const key = process.env["GEMINI_API_KEY"];
+            const key = body.credential?.apiKey?.trim() || process.env["GEMINI_API_KEY"];
             if (!key) {
               return new Response(
-                JSON.stringify({ error: "Gemini non configurato: manca GEMINI_API_KEY." }),
-                { status: 500, headers: { "content-type": "application/json" } },
+                JSON.stringify({
+                  error:
+                    "Gemini non configurato: inserisci la API key in Providers → Google Gemini.",
+                }),
+                { status: 400, headers: { "content-type": "application/json" } },
               );
             }
             model = createGeminiProvider(key)(modelId);
