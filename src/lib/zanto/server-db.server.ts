@@ -1,13 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { assertSupabasePublicEnv } from "@/integrations/supabase/env";
 
 /**
  * Layer: Storage-API (server side). Uses the publishable key; the guest-open RLS
  * policies apply. Never used for privileged operations.
  */
 export function createServerSupabase() {
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  const url = process.env["SUPABASE_URL"]!;
+  const { url, key } = assertSupabasePublicEnv();
   return createClient<Database>(url, key, {
     auth: { persistSession: false },
     global: {

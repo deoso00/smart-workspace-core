@@ -6,7 +6,17 @@ import {
   createGeminiProvider,
   createLovableAiGatewayProvider,
 } from "@/lib/ai-gateway.server";
+import {
+  generateImage,
+  generateGeminiVideo,
+  slugFromPrompt,
+  toDataUrl,
+  IMAGE_MODEL,
+  VIDEO_MODEL,
+  NON_CHAT_MODEL_IDS,
+} from "@/lib/media-gen.server";
 import { createServerSupabase } from "@/lib/zanto/server-db.server";
+import { writeVfsFileServer } from "@/lib/zanto/vfs.server";
 
 type ChatBody = {
   workspaceId?: string;
@@ -17,6 +27,8 @@ type ChatBody = {
   agent?: boolean;
   allowedTools?: string[];
   credential?: { apiKey?: string; baseUrl?: string };
+  /** Gemini key for media tools even when chat uses another provider. */
+  mediaCredential?: { apiKey?: string };
   messages?: { role: "user" | "assistant" | "system"; content: string }[];
   memory?: string;
 };
@@ -24,6 +36,7 @@ type ChatBody = {
 const BYO_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   groq: "https://api.groq.com/openai/v1",
+  openrouter: "https://openrouter.ai/api/v1",
 };
 
 const DEFAULT_PROVIDER = "google";
@@ -36,24 +49,48 @@ function jsonLine(payload: unknown) {
 
 /** Clear provider errors without leaking secrets. */
 function formatChatError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error);
-  const lower = raw.toLowerCase();
+  const nest =
+    error && typeof error === "object" && "lastError" in error
+      ? (error as { lastError: unknown }).lastError
+      : error;
+  const raw = nest instanceof Error ? nest.message : error instanceof Error ? error.message : String(error);
   const status =
-    typeof (error as { statusCode?: unknown })?.statusCode === "number"
-      ? (error as { statusCode: number }).statusCode
-      : typeof (error as { status?: unknown })?.status === "number"
-        ? (error as { status: number }).status
+    typeof (nest as { statusCode?: unknown })?.statusCode === "number"
+      ? (nest as { statusCode: number }).statusCode
+      : typeof (error as { statusCode?: unknown })?.statusCode === "number"
+        ? (error as { statusCode: number }).statusCode
         : undefined;
+  const body =
+    (nest as { responseBody?: string })?.responseBody ||
+    (error as { responseBody?: string })?.responseBody ||
+    "";
+  const detail = `${raw} ${body}`.toLowerCase();
 
-  if (status === 429 || /\b429\b/.test(raw) || lower.includes("rate limit") || lower.includes("resource_exhausted")) {
-    return "Limite di richieste Gemini raggiunto (rate limit 429). Riprova tra poco.";
+  if (
+    detail.includes("quota") ||
+    detail.includes("rate limit") ||
+    detail.includes("resource_exhausted") ||
+    detail.includes("limit: 0") ||
+    status === 429
+  ) {
+    return "Quota Gemini esaurita o modello media non disponibile in chat. Usa Media Studio per le immagini; per la chat tieni Gemini 3.7 Flash / OpenRouter / Ollama.";
   }
-  if (status === 401 || status === 403 || lower.includes("api key not valid") || lower.includes("unauthenticated")) {
-    return "Chiave Gemini non valida. Controlla la key in Providers → Google Gemini.";
+  if (detail.includes("not found") && detail.includes("veo")) {
+    return "Veo non è un modello chat. Usa Media Studio → Genera video (serve billing Google).";
   }
-  if (status === 402 || lower.includes("no credit") || lower.includes("payment required")) {
-    return "Crediti AI Gateway Lovable esauriti. Usa Google Gemini con la tua key in Providers.";
+  if (status === 429 || /\b429\b/.test(raw) || detail.includes("rate limit") || detail.includes("resource_exhausted")) {
+    return "Limite di richieste raggiunto (rate limit). Aspetta un minuto e riprova, o cambia modello.";
   }
+  if (status === 401 || status === 403 || detail.includes("api key") || detail.includes("unauthorized") || detail.includes("unauthenticated")) {
+    return "Chiave API non valida. Controlla Providers (Gemini / OpenRouter / Groq).";
+  }
+  if (status === 402 || detail.includes("no credit") || detail.includes("payment required") || detail.includes("insufficient")) {
+    return "Crediti esauriti sul provider. Prova OpenRouter free, Gemini o Ollama locale.";
+  }
+  if (detail.includes("provider returned error") || detail.includes("failed after")) {
+    return "OpenRouter/provider ha rifiutato la richiesta Agent (spesso modello free saturo o tool call fallita). Riprova, oppure passa a North Mini Code / Gemini.";
+  }
+  if (body && body.length < 400) return `${raw}: ${body}`;
   return raw;
 }
 
@@ -69,6 +106,16 @@ export const Route = createFileRoute("/api/chat")({
 
         const providerId = body.provider ?? DEFAULT_PROVIDER;
         const modelId = body.model ?? DEFAULT_MODEL;
+
+        if (NON_CHAT_MODEL_IDS.has(modelId) || /veo|flash-image|image-generation/i.test(modelId)) {
+          return new Response(
+            JSON.stringify({
+              error:
+                "Questo modello non serve per la chat. Usa Media Studio sotto il composer per immagini/video, e tieni Gemini 3.7 Flash / Laguna / Ollama per il testo.",
+            }),
+            { status: 400, headers: { "content-type": "application/json" } },
+          );
+        }
 
         let model;
         try {
@@ -94,13 +141,7 @@ export const Route = createFileRoute("/api/chat")({
             }
             model = createLovableAiGatewayProvider(key)(modelId);
           } else if (providerId === "ollama") {
-            const base = body.credential?.baseUrl;
-            if (!base) {
-              return new Response(
-                JSON.stringify({ error: "Runtime locale non configurato: nessun endpoint." }),
-                { status: 400, headers: { "content-type": "application/json" } },
-              );
-            }
+            const base = body.credential?.baseUrl?.trim() || "http://localhost:11434";
             model = createByoProvider("ollama", `${base.replace(/\/$/, "")}/v1`)(modelId);
           } else {
             const apiKey = body.credential?.apiKey;
@@ -260,6 +301,101 @@ export const Route = createFileRoute("/api/chat")({
               return { notes: data ?? [] };
             },
           }),
+          media_generate_image: tool({
+            description:
+              "Genera una VERA immagine raster (PNG/JPEG) e la salva in /media/. Usalo SEMPRE se l'utente chiede un'immagine/disegno/logo. MAI rispondere con ASCII art.",
+            inputSchema: z.object({
+              prompt: z.string().describe("Descrizione dell'immagine da generare"),
+              path: z
+                .string()
+                .optional()
+                .describe("Percorso assoluto opzionale, es. /media/logo.png"),
+            }),
+            execute: async ({ prompt, path }) => {
+              if (!supabase || !workspaceId) return { error: "Workspace non disponibile" };
+              const key =
+                body.mediaCredential?.apiKey?.trim() ||
+                (providerId === "google" ? body.credential?.apiKey?.trim() : undefined) ||
+                process.env["GEMINI_API_KEY"];
+              try {
+                const image = await generateImage(prompt, key);
+                const dataUrl = toDataUrl(image.mimeType, image.base64);
+                const ext = image.mimeType.includes("png") ? "png" : "jpg";
+                const dest =
+                  path?.startsWith("/")
+                    ? path
+                    : `/media/${slugFromPrompt(prompt)}-${Date.now().toString(36)}.${ext}`;
+                const written = await writeVfsFileServer(
+                  supabase,
+                  workspaceId,
+                  ownerKey,
+                  dest,
+                  dataUrl,
+                );
+                if ("error" in written) return written;
+                return {
+                  ok: true,
+                  path: written.path,
+                  model: image.source === "gemini" ? "gemini-2.5-flash-image" : IMAGE_MODEL,
+                  source: image.source,
+                };
+              } catch (error) {
+                return { error: error instanceof Error ? error.message : String(error) };
+              }
+            },
+          }),
+          media_generate_video: tool({
+            description:
+              "Genera un video breve con Veo (richiede billing Google a pagamento) e lo salva in /media/.",
+            inputSchema: z.object({
+              prompt: z.string().describe("Descrizione del video"),
+              path: z.string().optional().describe("Percorso assoluto opzionale"),
+            }),
+            execute: async ({ prompt, path }) => {
+              if (!supabase || !workspaceId) return { error: "Workspace non disponibile" };
+              const key =
+                body.mediaCredential?.apiKey?.trim() ||
+                (providerId === "google" ? body.credential?.apiKey?.trim() : undefined) ||
+                process.env["GEMINI_API_KEY"];
+              if (!key) {
+                return {
+                  error:
+                    "Chiave Gemini assente: salvala in Providers → Google Gemini.",
+                };
+              }
+              try {
+                const video = await generateGeminiVideo(key, prompt);
+                const stamp = Date.now().toString(36);
+                let dest: string;
+                let content: string;
+                if (video.base64 && !video.tooLarge) {
+                  dest = path?.startsWith("/") ? path : `/media/${slugFromPrompt(prompt)}-${stamp}.mp4`;
+                  content = toDataUrl(video.mimeType, video.base64);
+                } else {
+                  dest = path?.startsWith("/")
+                    ? path
+                    : `/media/${slugFromPrompt(prompt)}-${stamp}.video.html`;
+                  content = `<!DOCTYPE html><html lang="it"><body><h1>Video Veo</h1><p>${prompt.replace(/</g, "&lt;")}</p><p>URI: ${video.uri ?? ""}</p><p>Modello ${VIDEO_MODEL} — richiede billing.</p></body></html>`;
+                }
+                const written = await writeVfsFileServer(
+                  supabase,
+                  workspaceId,
+                  ownerKey,
+                  dest,
+                  content,
+                );
+                if ("error" in written) return written;
+                return {
+                  ok: true,
+                  path: written.path,
+                  model: VIDEO_MODEL,
+                  tooLarge: Boolean(video.tooLarge || !video.base64),
+                };
+              } catch (error) {
+                return { error: error instanceof Error ? error.message : String(error) };
+              }
+            },
+          }),
         };
 
         const tools = Object.fromEntries(
@@ -270,9 +406,16 @@ export const Route = createFileRoute("/api/chat")({
         const system = [
           "Sei ZAnto.AI, un assistente AI personale che lavora dentro un workspace con filesystem virtuale.",
           "Rispondi in italiano se l'utente scrive in italiano. Sii concreto e onesto: non inventare risultati di strumenti.",
+          "VIETATO disegnare in ASCII art, emoji-art o fingere un'immagine in testo. Non sei un generatore di immagini in chat.",
           useAgent
-            ? "Modalità Agent attiva: puoi usare gli strumenti autorizzati per leggere e scrivere file virtuali e memoria. Descrivi brevemente ogni azione."
-            : "Modalità chat semplice: nessuno strumento disponibile.",
+            ? [
+                "Modalità Agent attiva: hai strumenti reali (vfs_list, vfs_read, vfs_write, memory_save, memory_list, media_generate_image, media_generate_video).",
+                "Quando l'utente chiede di creare o modificare file, CHIAMA subito vfs_write: non narrare i passi, non dire 'ti prego di aspettare', non fingere di scrivere.",
+                "Se l'utente chiede un'immagine, un disegno, un logo, una foto o una illustrazione: CHIAMA subito media_generate_image con il prompt. Non scrivere ASCII, non descrivere pixel, non dire 'ecco il disegno'.",
+                "Per video: media_generate_video (richiede billing Google). Se fallisce, dillo chiaramente.",
+                "Percorsi assoluti che iniziano con / (es. /index.html). Dopo il tool, conferma breve con il path scritto.",
+              ].join(" ")
+            : "Modalità chat semplice: nessuno strumento. Se chiede un'immagine, digli di usare Media Studio sotto il composer (Genera immagine) oppure di attivare Agent.",
           body.memory ? `Memoria del workspace:\n${body.memory}` : "",
         ]
           .filter(Boolean)
@@ -293,7 +436,7 @@ export const Route = createFileRoute("/api/chat")({
               }
             };
             try {
-              const timeout = AbortSignal.timeout(85_000);
+              const timeout = AbortSignal.timeout(useAgent ? 200_000 : 85_000);
               const signal = AbortSignal.any
                 ? AbortSignal.any([request.signal, timeout])
                 : request.signal;
@@ -346,7 +489,7 @@ export const Route = createFileRoute("/api/chat")({
                   jsonLine({
                     t: "error",
                     v: timedOut
-                      ? "Timeout verso Gemini. Riprova con Agent spento o un messaggio più corto."
+                      ? "Timeout verso il modello. Riprova con Agent spento, un messaggio più corto, o un altro modello."
                       : formatChatError(error),
                   }),
                 );

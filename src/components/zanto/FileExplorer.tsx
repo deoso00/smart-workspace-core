@@ -19,6 +19,14 @@ import { downloadFile, downloadZip } from "@/lib/zanto/export";
 
 type TreeNode = VfsNode & { children: TreeNode[] };
 
+function isDataImage(content: string | null | undefined): boolean {
+  return Boolean(content?.startsWith("data:image/"));
+}
+
+function isDataVideo(content: string | null | undefined): boolean {
+  return Boolean(content?.startsWith("data:video/"));
+}
+
 function buildTree(nodes: VfsNode[]): TreeNode[] {
   const map = new Map<string, TreeNode>();
   for (const node of nodes) map.set(node.id, { ...node, children: [] });
@@ -246,12 +254,33 @@ export function FileExplorer({
           </div>
         </div>
         {selected && selected.kind === "file" ? (
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            spellCheck={false}
-            className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent font-mono text-xs leading-relaxed focus-visible:ring-0"
-          />
+          isDataImage(draft) ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-3">
+              <img
+                src={draft}
+                alt={selected.name}
+                className="mx-auto max-h-[min(60vh,420px)] max-w-full rounded-md border border-border object-contain"
+              />
+              <p className="text-center text-[10px] text-muted-foreground">
+                Anteprima immagine (contenuto data-URL nel VFS)
+              </p>
+            </div>
+          ) : isDataVideo(draft) ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-3">
+              <video
+                src={draft}
+                controls
+                className="mx-auto max-h-[min(60vh,420px)] max-w-full rounded-md border border-border"
+              />
+            </div>
+          ) : (
+            <Textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              spellCheck={false}
+              className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent font-mono text-xs leading-relaxed focus-visible:ring-0"
+            />
+          )
         ) : (
           <div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground">
             Seleziona un file per aprirlo nell'editor.

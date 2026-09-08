@@ -22,9 +22,14 @@ export function createLovableAiGatewayProvider(apiKey: string) {
 
 /** Bring-your-own provider using an OpenAI-compatible endpoint. */
 export function createByoProvider(name: string, baseURL: string, apiKey?: string) {
+  const headers: Record<string, string> = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  if (name === "openrouter") {
+    headers["HTTP-Referer"] = "http://localhost:8080";
+    headers["X-Title"] = "ZAnto.AI";
+  }
   return createOpenAICompatible({
     name,
     baseURL,
-    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    headers,
   });
 }

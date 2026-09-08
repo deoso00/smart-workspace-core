@@ -1,0 +1,5 @@
+# Desktop / Electron artifacts
+desktop/.output/
+desktop/dist/
+desktop/backup/
+*.exe

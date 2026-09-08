@@ -9,6 +9,7 @@ lerna-debug.log*
 
 # Env / secrets — keep private keys out of git.
 # Public Vite/Supabase publishable vars MAY be committed so Lovable builds work.
+.env
 .env.local
 .env.*.local
 !.env.example
@@ -24,6 +25,14 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
+
+# Desktop / Electron build artifacts
+desktop/.output/
+desktop/dist/
+desktop/backup/
+desktop/builder-log.txt
+poll-out.bin
+*.exe
 
 # Wrangler / Cloudflare
 .wrangler/

@@ -25,6 +25,7 @@ export type ChatRequest = {
   agent: boolean;
   allowedTools: string[];
   credential?: { apiKey?: string; baseUrl?: string };
+  mediaCredential?: { apiKey?: string };
   memory?: string;
   messages: { role: "user" | "assistant" | "system"; content: string }[];
 };

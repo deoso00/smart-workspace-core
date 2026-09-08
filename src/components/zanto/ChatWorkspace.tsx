@@ -41,16 +41,26 @@ import { getGuestKey } from "@/lib/zanto/guest";
 import { isProviderConfigured, readCredential } from "@/lib/zanto/providers";
 import { useWorkspace } from "@/lib/zanto/workspace-context";
 import { FileExplorer } from "./FileExplorer";
+import { MediaStudio } from "./MediaStudio";
 
 export function ChatWorkspace() {
   const { activeId: workspaceId, loading, error: workspaceError, retry } = useWorkspace();
   const queryClient = useQueryClient();
 
   const [convoId, setConvoId] = useState<string | null>(null);
-  const [provider, setProvider] = useState("google");
-  const [model, setModel] = useState("gemini-3.7-flash");
-  const [mode, setMode] = useState("AUTO");
+  const desktop =
+    import.meta.env.VITE_ZANTO_DESKTOP === "1" ||
+    (typeof window !== "undefined" && Boolean((window as { zantoDesktop?: unknown }).zantoDesktop));
+  const [provider, setProvider] = useState(desktop ? "ollama" : "google");
+  const [model, setModel] = useState(desktop ? "llama3.2:1b" : "gemini-3.7-flash");
+  const [mode, setMode] = useState(desktop ? "LOCAL" : "AUTO");
   const [agent, setAgent] = useState(false);
+
+  useEffect(() => {
+    if (/veo|flash-image|image-generation/i.test(model)) {
+      setModel(getProvider(provider)?.models[0]?.id ?? "gemini-3.7-flash");
+    }
+  }, [model, provider]);
   const [input, setInput] = useState("");
   const [streamText, setStreamText] = useState("");
   const [tools, setTools] = useState<ToolActivity[]>([]);
@@ -95,7 +105,13 @@ export function ChatWorkspace() {
 
   const allowedTools = TOOLS.filter((tool) => {
     const row = permissions.find((p) => p.tool_name === tool.name);
-    return row ? row.allowed : !tool.mutating || tool.name === "vfs_write" || tool.name === "memory_save";
+    return row
+      ? row.allowed
+      : !tool.mutating ||
+          tool.name === "vfs_write" ||
+          tool.name === "memory_save" ||
+          tool.name === "media_generate_image" ||
+          tool.name === "media_generate_video";
   }).map((tool) => tool.name);
 
   const newConversation = useMutation({
@@ -173,8 +189,8 @@ export function ChatWorkspace() {
     let sawError = false;
     const timeoutId = window.setTimeout(() => {
       controller.abort();
-      toast.error("Timeout: Gemini non ha risposto in tempo. Riprova o disattiva Agent.");
-    }, 90_000);
+      toast.error("Timeout: il modello non ha risposto in tempo. Riprova o disattiva Agent.");
+    }, agent ? 210_000 : 90_000);
 
     try {
       await streamChat(
@@ -187,6 +203,7 @@ export function ChatWorkspace() {
           agent,
           allowedTools,
           credential: readCredential(provider),
+          mediaCredential: readCredential("google"),
           memory: memory
             .slice(0, 10)
             .map((note) => `- ${note.label}: ${note.body}`)
@@ -407,6 +424,7 @@ export function ChatWorkspace() {
                 </Button>
               )}
             </div>
+            <MediaStudio workspaceId={workspaceId} />
 
             {/* Model / provider under chat — real catalog only */}
             <div className="flex flex-wrap items-center gap-1.5 px-0.5">

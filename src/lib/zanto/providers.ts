@@ -9,15 +9,26 @@ import { getProvider, PROVIDERS } from "./catalog";
 
 const PREFIX = "zanto.provider.";
 
+/** Default local endpoints so Ollama works without a manual Providers save. */
+const LOCAL_DEFAULT_BASE: Record<string, string> = {
+  ollama: "http://localhost:11434",
+};
+
 export type ProviderCredential = { apiKey?: string; baseUrl?: string };
 
 export function readCredential(providerId: string): ProviderCredential {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(PREFIX + providerId);
-    return raw ? (JSON.parse(raw) as ProviderCredential) : {};
+    const cred = raw ? (JSON.parse(raw) as ProviderCredential) : {};
+    if (!cred.baseUrl?.trim()) {
+      const fallback = LOCAL_DEFAULT_BASE[providerId];
+      if (fallback) return { ...cred, baseUrl: fallback };
+    }
+    return cred;
   } catch {
-    return {};
+    const fallback = LOCAL_DEFAULT_BASE[providerId];
+    return fallback ? { baseUrl: fallback } : {};
   }
 }
 

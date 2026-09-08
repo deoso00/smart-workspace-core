@@ -36,9 +36,9 @@ export const PROVIDERS: ProviderInfo[] = [
     keyLabel: "Gemini API key (AIza...)",
     docs: "https://aistudio.google.com/apikey",
     description:
-      "Incolla la tua chiave Gemini qui: resta in questo browser. Le chiamate vanno a Google (non consumano crediti AI Gateway Lovable).",
+      "Chat Gemini + Media Studio (immagini gratis via Pollinations; video Veo solo con billing Google).",
     models: [
-      { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Default — fatturato su Google" },
+      { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Default — solo chat" },
     ],
   },
   {
@@ -93,6 +93,38 @@ export const PROVIDERS: ProviderInfo[] = [
     ],
   },
   {
+    id: "openrouter",
+    label: "OpenRouter (gratis)",
+    builtInKey: false,
+    runtime: "cloud",
+    keyLabel: "OpenRouter API key (sk-or-...)",
+    docs: "https://openrouter.ai/keys",
+    description:
+      "Gateway gratuito con modelli cloud forti per codice. Limite tipico ~50 req/giorno senza crediti pagati.",
+    models: [
+      {
+        id: "poolside/laguna-s-2.1:free",
+        label: "Laguna S 2.1 (free)",
+        note: "Coding agent — migliore per app",
+      },
+      {
+        id: "cohere/north-mini-code:free",
+        label: "North Mini Code (free)",
+        note: "Coding agent leggero",
+      },
+      {
+        id: "poolside/laguna-xs-2.1:free",
+        label: "Laguna XS 2.1 (free)",
+        note: "Coding più veloce",
+      },
+      {
+        id: "openrouter/free",
+        label: "Free router",
+        note: "Sceglie un modello free a caso",
+      },
+    ],
+  },
+  {
     id: "ollama",
     label: "Ollama (locale)",
     builtInKey: false,
@@ -102,8 +134,10 @@ export const PROVIDERS: ProviderInfo[] = [
     description:
       "Runtime locale sulla tua macchina. Nessuna simulazione: se non risponde, ZAnto.AI dichiara il runtime non rilevato.",
     models: [
-      { id: "llama3.2", label: "llama3.2", note: "Locale" },
+      { id: "llama3.2", label: "llama3.2", note: "Locale ~3B" },
+      { id: "llama3.2:1b", label: "llama3.2:1b", note: "Locale leggero" },
       { id: "qwen2.5-coder", label: "qwen2.5-coder", note: "Locale, codice" },
+      { id: "qwen2.5-coder:1.5b", label: "qwen2.5-coder:1.5b", note: "Locale codice leggero" },
     ],
   },
 ];
@@ -161,6 +195,18 @@ export const TOOLS: ToolInfo[] = [
     label: "Leggi memoria",
     description: "Elenca le note di memoria del workspace.",
     mutating: false,
+  },
+  {
+    name: "media_generate_image",
+    label: "Genera immagine",
+    description: "Genera un'immagine (gratis) e la salva in /media/.",
+    mutating: true,
+  },
+  {
+    name: "media_generate_video",
+    label: "Genera video",
+    description: "Genera un video breve con Veo (richiede billing Google) e lo salva in /media/.",
+    mutating: true,
   },
 ];
 

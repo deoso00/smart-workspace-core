@@ -1,0 +1,34 @@
+appId: ai.zanto.desktop
+productName: ZAntoAI
+executableName: ZAntoAI
+copyright: Copyright © ZAnto
+directories:
+  output: desktop/dist
+files:
+  - desktop/main.cjs
+  - desktop/preload.cjs
+  - desktop/README-INSTALL-IT.md
+  - package.json
+extraResources:
+  - from: desktop/.output
+    to: app-server
+    filter:
+      - "**/*"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ZAnto-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ZAnto AI
+  installerLanguages:
+    - Italian
+    - English
+extraMetadata:
+  main: desktop/main.cjs
+electronVersion: 37.2.0
