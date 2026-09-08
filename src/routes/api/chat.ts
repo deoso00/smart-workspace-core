@@ -20,6 +20,7 @@ type ChatBody = {
 const BYO_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   groq: "https://api.groq.com/openai/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai/",
 };
 
 function jsonLine(payload: unknown) {
@@ -36,12 +37,22 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Nessun messaggio", { status: 400 });
         }
 
-        const providerId = body.provider ?? "lovable";
-        const modelId = body.model ?? "google/gemini-3.7-flash";
+        const providerId = body.provider ?? "google";
+        const modelId = body.model ?? "gemini-3.7-flash";
 
         let model;
         try {
-          if (providerId === "lovable") {
+          if (providerId === "google") {
+            const key = process.env["GEMINI_API_KEY"];
+            if (!key) {
+              return new Response(
+                JSON.stringify({ error: "Google Gemini non configurato: GEMINI_API_KEY assente su questo progetto." }),
+                { status: 500, headers: { "content-type": "application/json" } },
+              );
+            }
+            const googleModelId = modelId.replace(/^google\//, "");
+            model = createByoProvider("google", BYO_BASE_URLS.google!, key)(googleModelId);
+          } else if (providerId === "lovable") {
             const key = process.env["LOVABLE_API_KEY"];
             if (!key) {
               return new Response(
