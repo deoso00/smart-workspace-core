@@ -378,8 +378,8 @@ export async function listMemory(workspaceId: string): Promise<MemoryNote[]> {
   );
 }
 
-export async function saveMemory(workspaceId: string, label: string, body: string) {
-  unwrap(
+export async function saveMemory(workspaceId: string, label: string, body: string): Promise<MemoryNote> {
+  const note = unwrap(
     await supabase
       .from("memory_notes")
       .insert({ workspace_id: workspaceId, owner_key: getGuestKey(), label, body })
@@ -387,6 +387,7 @@ export async function saveMemory(workspaceId: string, label: string, body: strin
       .single(),
   );
   await logActivity(workspaceId, "memory", `Nota "${label}" salvata`);
+  return note;
 }
 
 export async function deleteMemory(id: string) {

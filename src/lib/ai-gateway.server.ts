@@ -25,7 +25,7 @@ export function sanitizeApiKey(raw: string): string {
   let key = raw.trim().replace(/^\uFEFF/, "");
   // Full .env line pasted into Providers: OPENROUTER_API_KEY=sk-or-v1-...
   const envLine = key.match(/^[A-Z][A-Z0-9_]*=(.*)$/s);
-  if (envLine) key = envLine[1].trim();
+  if (envLine) key = envLine[1]?.trim() ?? "";
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
     (key.startsWith("'") && key.endsWith("'"))

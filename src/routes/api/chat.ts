@@ -198,7 +198,7 @@ export const Route = createFileRoute("/api/chat")({
                 { status: 400, headers: { "content-type": "application/json" } },
               );
             }
-            model = createByoProvider("openrouter", BYO_BASE_URLS.openrouter, apiKey)(modelId);
+            model = createByoProvider("openrouter", BYO_BASE_URLS['openrouter']!, apiKey)(modelId);
           } else {
             const apiKey = body.credential?.apiKey;
             const base = BYO_BASE_URLS[providerId];

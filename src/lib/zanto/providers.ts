@@ -20,7 +20,7 @@ export type ProviderCredential = { apiKey?: string; baseUrl?: string };
 export function cleanProviderSecret(raw: string): string {
   let key = raw.trim().replace(/^\uFEFF/, "");
   const envLine = key.match(/^[A-Z][A-Z0-9_]*=(.*)$/s);
-  if (envLine) key = envLine[1].trim();
+  if (envLine) key = envLine[1]?.trim() ?? "";
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
     (key.startsWith("'") && key.endsWith("'"))
