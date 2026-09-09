@@ -60,7 +60,7 @@ export function ChatWorkspace() {
 
   const [convoId, setConvoId] = useState<string | null>(null);
   const desktop =
-    import.meta.env.VITE_ZANTO_DESKTOP === "1" ||
+    import.meta.env['VITE_ZANTO_DESKTOP'] === "1" ||
     (typeof window !== "undefined" && Boolean((window as { zantoDesktop?: unknown }).zantoDesktop));
   const onLovableHost =
     typeof window !== "undefined" &&
