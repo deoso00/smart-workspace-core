@@ -489,7 +489,15 @@ export const Route = createFileRoute("/api/chat")({
               }
             };
             try {
-              const timeout = AbortSignal.timeout(useAgent ? 200_000 : 85_000);
+              const timeout = AbortSignal.timeout(
+                useAgent
+                  ? providerId === "ollama"
+                    ? 180_000
+                    : 120_000
+                  : providerId === "ollama"
+                    ? 90_000
+                    : 55_000,
+              );
               const signal = AbortSignal.any
                 ? AbortSignal.any([request.signal, timeout])
                 : request.signal;

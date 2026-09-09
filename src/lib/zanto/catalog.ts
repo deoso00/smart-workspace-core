@@ -135,10 +135,12 @@ export const PROVIDERS: ProviderInfo[] = [
     description:
       "Runtime locale sulla tua macchina. Nessuna simulazione: se non risponde, ZAnto.AI dichiara il runtime non rilevato.",
     models: [
+      { id: "dolphin-mistral", label: "Dolphin Mistral 7B", note: "7B — chat/code, più capace dei 1B" },
+      { id: "dolphin-llama3", label: "Dolphin Llama3 8B", note: "8B — coding + agent migliore" },
+      { id: "qwen2.5-coder", label: "qwen2.5-coder", note: "Locale codice (consigliato per app)" },
+      { id: "qwen2.5-coder:1.5b", label: "qwen2.5-coder:1.5b", note: "Locale codice leggero" },
       { id: "llama3.2", label: "llama3.2", note: "Locale ~3B" },
       { id: "llama3.2:1b", label: "llama3.2:1b", note: "Locale leggero" },
-      { id: "qwen2.5-coder", label: "qwen2.5-coder", note: "Locale, codice" },
-      { id: "qwen2.5-coder:1.5b", label: "qwen2.5-coder:1.5b", note: "Locale codice leggero" },
     ],
   },
 ];

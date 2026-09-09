@@ -24,11 +24,16 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { MODES, PROVIDERS, TOOLS, getProvider } from "@/lib/zanto/catalog";
+import { MODES, PROVIDERS, TOOLS, getProvider, type ModelInfo } from "@/lib/zanto/catalog";
 import { streamChat, type ToolActivity } from "@/lib/zanto/chat-client";
 import { streamOpenRouterChat } from "@/lib/zanto/openrouter-client";
 import { streamOpenRouterAgent } from "@/lib/zanto/openrouter-agent";
-import { cleanProviderSecret, isProviderConfigured, readCredential } from "@/lib/zanto/providers";
+import {
+  cleanProviderSecret,
+  isProviderConfigured,
+  listOllamaModelNames,
+  readCredential,
+} from "@/lib/zanto/providers";
 import {
   addMessage,
   createConversation,
@@ -78,6 +83,7 @@ export function ChatWorkspace() {
   const [streamText, setStreamText] = useState("");
   const [tools, setTools] = useState<ToolActivity[]>([]);
   const [busy, setBusy] = useState(false);
+  const [ollamaLiveModels, setOllamaLiveModels] = useState<ModelInfo[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -112,6 +118,44 @@ export function ChatWorkspace() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length, streamText]);
+
+  useEffect(() => {
+    if (provider !== "ollama") {
+      setOllamaLiveModels([]);
+      return;
+    }
+    let cancelled = false;
+    const base = readCredential("ollama").baseUrl?.trim() || "http://localhost:11434";
+    void listOllamaModelNames(base)
+      .then((names) => {
+        if (cancelled) return;
+        const catalog = getProvider("ollama")?.models ?? [];
+        const map = new Map<string, ModelInfo>();
+        for (const m of catalog) map.set(m.id, m);
+        for (const name of names) {
+          const short = name.replace(/:latest$/, "");
+          if (!map.has(name)) {
+            map.set(name, { id: name, label: name, note: "Rilevato da Ollama" });
+          }
+          if (short !== name && !map.has(short)) {
+            map.set(short, { id: short, label: short, note: "Rilevato da Ollama" });
+          }
+          // Upgrade label if catalog has a nicer name for the short id
+          const nice = catalog.find((c) => c.id === short || c.id === name);
+          if (nice) {
+            map.set(short, nice);
+            if (name !== short) map.set(name, { ...nice, id: name, label: `${nice.label} (${name})` });
+          }
+        }
+        setOllamaLiveModels([...map.values()]);
+      })
+      .catch(() => {
+        if (!cancelled) setOllamaLiveModels(getProvider("ollama")?.models ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
 
   const providerInfo = getProvider(provider);
   const configured = isProviderConfigured(provider);
@@ -167,15 +211,25 @@ export function ChatWorkspace() {
 
     let conversationId = convoId;
     if (!conversationId) {
-      const convo = await createConversation(workspaceId, {
-        title: text.slice(0, 60),
-        provider,
-        model,
-        mode,
-        runtime: providerInfo?.runtime ?? "cloud",
-      });
-      conversationId = convo.id;
-      setConvoId(convo.id);
+      try {
+        const convo = await Promise.race([
+          createConversation(workspaceId, {
+            title: text.slice(0, 60),
+            provider,
+            model,
+            mode,
+            runtime: providerInfo?.runtime ?? "cloud",
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout creazione chat (Supabase). Controlla la connessione.")), 12_000),
+          ),
+        ]);
+        conversationId = convo.id;
+        setConvoId(convo.id);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Impossibile creare la conversazione");
+        return;
+      }
     }
 
     setInput("");
@@ -191,19 +245,36 @@ export function ChatWorkspace() {
       { role: "user" as const, content: text },
     ];
 
-    await addMessage(conversationId, "user", text);
-    void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-    void queryClient.invalidateQueries({ queryKey: ["conversations", workspaceId] });
-
     const controller = new AbortController();
     abortRef.current = controller;
     let assembled = "";
     const collected: ToolActivity[] = [];
     let sawError = false;
+    // Timeout starts immediately — never wait forever on Supabase or the model.
+    const timeoutMs = provider === "ollama" ? (agent ? 180_000 : 90_000) : agent ? 120_000 : 45_000;
     const timeoutId = window.setTimeout(() => {
       controller.abort();
-      toast.error("Timeout: il modello non ha risposto in tempo. Riprova o disattiva Agent.");
-    }, agent ? 210_000 : 60_000);
+      toast.error(
+        provider === "ollama"
+          ? "Timeout Ollama. I modelli 7B sul PC sono lenti: attendi o usa llama3.2:1b / OpenRouter."
+          : "Timeout: nessuna risposta. Controlla rete/Supabase/chiave, Agent OFF, riprova.",
+      );
+    }, timeoutMs);
+
+    // Persist user message in background — do not block the model call.
+    void Promise.race([
+      addMessage(conversationId, "user", text),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout-save")), 10_000),
+      ),
+    ])
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ["conversations", workspaceId] });
+      })
+      .catch(() => {
+        toast.message("Messaggio inviato al modello; salvataggio chat lento (Supabase).");
+      });
 
     try {
       const handlers = {
@@ -275,7 +346,7 @@ export function ChatWorkspace() {
         );
       }
 
-      if (!sawError && !assembled.trim() && collected.length === 0) {
+      if (!sawError && !assembled.trim() && collected.length === 0 && !controller.signal.aborted) {
         toast.error(
           "Nessuna risposta dal modello. Prova Free router / North Mini, Agent OFF, o Stop e riprova.",
         );
@@ -286,14 +357,19 @@ export function ChatWorkspace() {
       window.clearTimeout(timeoutId);
       if (assembled.trim() || collected.length > 0) {
         try {
-          await addMessage(
-            conversationId,
-            "assistant",
-            assembled || "(interrotto)",
-            collected as unknown[],
-          );
-        } catch (error) {
-          toast.error((error as Error).message);
+          await Promise.race([
+            addMessage(
+              conversationId,
+              "assistant",
+              assembled || "(interrotto)",
+              collected as unknown[],
+            ),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error("timeout-save-assistant")), 10_000),
+            ),
+          ]);
+        } catch {
+          toast.message("Risposta ricevuta ma salvataggio lento (Supabase).");
         }
       }
       setStreamText("");
@@ -344,7 +420,10 @@ export function ChatWorkspace() {
   }
 
   const selectableProviders = PROVIDERS;
-  const selectableModels = providerInfo?.models ?? [];
+  const selectableModels =
+    provider === "ollama" && ollamaLiveModels.length > 0
+      ? ollamaLiveModels
+      : (providerInfo?.models ?? []);
 
   return (
     <div className="flex h-full min-h-0 bg-background">
@@ -483,10 +562,11 @@ export function ChatWorkspace() {
                   <Bot className="size-3 text-primary" />
                   <SelectValue placeholder="Modello" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-72">
                   {selectableModels.map((m) => (
                     <SelectItem key={m.id} value={m.id} className="text-xs">
                       {m.label}
+                      {m.note ? ` · ${m.note}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

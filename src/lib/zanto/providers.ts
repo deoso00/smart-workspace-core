@@ -91,3 +91,11 @@ export async function probeLocalRuntime(
     return { detected: false, detail: "Runtime non rilevato su questo endpoint" };
   }
 }
+
+/** Names as reported by `ollama list` /api/tags (e.g. dolphin-mistral:latest). */
+export async function listOllamaModelNames(baseUrl: string): Promise<string[]> {
+  const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/tags`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as { models?: { name: string }[] };
+  return (data.models ?? []).map((m) => m.name).filter(Boolean);
+}
