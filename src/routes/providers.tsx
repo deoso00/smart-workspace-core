@@ -13,21 +13,9 @@ import {
   probeLocalRuntime,
   readCredential,
   writeCredential,
+  cleanProviderSecret,
 } from "@/lib/zanto/providers";
-
-function cleanProviderSecret(raw: string): string {
-  let key = raw.trim().replace(/^\uFEFF/, "");
-  const envLine = key.match(/^[A-Z][A-Z0-9_]*=(.*)$/s);
-  if (envLine) key = envLine[1].trim();
-  if (
-    (key.startsWith('"') && key.endsWith('"')) ||
-    (key.startsWith("'") && key.endsWith("'"))
-  ) {
-    key = key.slice(1, -1).trim();
-  }
-  if (/^bearer\s+/i.test(key)) key = key.replace(/^bearer\s+/i, "").trim();
-  return key.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
-}
+import { probeOpenRouterKey } from "@/lib/zanto/openrouter-client";
 
 export const Route = createFileRoute("/providers")({
   head: () => ({
@@ -203,6 +191,26 @@ function CredentialForm({
       >
         Rimuovi
       </Button>
+      {providerId === "openrouter" && (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={async () => {
+            const fromField =
+              value.trim() && !value.startsWith("••") ? cleanProviderSecret(value) : "";
+            const key = fromField || readCredential("openrouter").apiKey?.trim() || "";
+            if (!key) {
+              toast.error("Incolla la chiave sk-or-v1-… e Salva, oppure Testa subito dopo averla incollata.");
+              return;
+            }
+            const result = await probeOpenRouterKey(key);
+            if (result.ok) toast.success(result.detail);
+            else toast.error(result.detail);
+          }}
+        >
+          Testa chiave
+        </Button>
+      )}
     </div>
   );
 }

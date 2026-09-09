@@ -16,6 +16,21 @@ const LOCAL_DEFAULT_BASE: Record<string, string> = {
 
 export type ProviderCredential = { apiKey?: string; baseUrl?: string };
 
+/** Normalize pasted secrets (env lines, quotes, Bearer prefix). */
+export function cleanProviderSecret(raw: string): string {
+  let key = raw.trim().replace(/^\uFEFF/, "");
+  const envLine = key.match(/^[A-Z][A-Z0-9_]*=(.*)$/s);
+  if (envLine) key = envLine[1].trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
+  }
+  if (/^bearer\s+/i.test(key)) key = key.replace(/^bearer\s+/i, "").trim();
+  return key.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
 export function readCredential(providerId: string): ProviderCredential {
   if (typeof window === "undefined") return {};
   try {

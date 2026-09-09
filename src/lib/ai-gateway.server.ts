@@ -52,8 +52,11 @@ export function createByoProvider(name: string, baseURL: string, apiKey?: string
   return createOpenAICompatible({
     name,
     baseURL,
-    // Required: SDK auth uses apiKey (custom Authorization alone is unreliable).
     ...(key ? { apiKey: key } : {}),
-    headers,
+    headers: {
+      ...headers,
+      // Belt-and-suspenders: some hosts drop one of these auth styles.
+      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+    },
   });
 }

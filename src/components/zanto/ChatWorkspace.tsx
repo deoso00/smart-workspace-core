@@ -26,6 +26,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { MODES, PROVIDERS, TOOLS, getProvider } from "@/lib/zanto/catalog";
 import { streamChat, type ToolActivity } from "@/lib/zanto/chat-client";
+import { streamOpenRouterChat } from "@/lib/zanto/openrouter-client";
+import { cleanProviderSecret, isProviderConfigured, readCredential } from "@/lib/zanto/providers";
 import {
   addMessage,
   createConversation,
@@ -38,7 +40,6 @@ import {
   type Conversation,
 } from "@/lib/zanto/db";
 import { getGuestKey } from "@/lib/zanto/guest";
-import { isProviderConfigured, readCredential } from "@/lib/zanto/providers";
 import { useWorkspace } from "@/lib/zanto/workspace-context";
 import { FileExplorer } from "./FileExplorer";
 import { MediaStudio } from "./MediaStudio";
@@ -204,45 +205,72 @@ export function ChatWorkspace() {
     }, agent ? 210_000 : 90_000);
 
     try {
-      await streamChat(
-        {
-          workspaceId,
-          ownerKey: getGuestKey(),
-          provider,
-          model,
-          mode,
-          agent,
-          allowedTools,
-          credential: readCredential(provider),
-          mediaCredential: readCredential("google"),
-          memory: memory
-            .slice(0, 10)
-            .map((note) => `- ${note.label}: ${note.body}`)
-            .join("\n"),
-          messages: history,
+      const handlers = {
+        onText: (delta: string) => {
+          assembled += delta;
+          setStreamText(assembled);
         },
-        {
-          onText: (delta) => {
-            assembled += delta;
-            setStreamText(assembled);
-          },
-          onTool: (activity) => {
-            const idx = collected.findIndex((t) => t.id === activity.id);
-            if (idx >= 0) collected[idx] = activity;
-            else collected.push(activity);
-            setTools([...collected]);
-          },
-          onError: (message) => {
-            sawError = true;
-            toast.error(message);
-          },
+        onTool: (activity: ToolActivity) => {
+          const idx = collected.findIndex((t) => t.id === activity.id);
+          if (idx >= 0) collected[idx] = activity;
+          else collected.push(activity);
+          setTools([...collected]);
         },
-        controller.signal,
-      );
+        onError: (message: string) => {
+          sawError = true;
+          toast.error(message);
+        },
+      };
+
+      // OpenRouter from the browser: Lovable server often strips Authorization → false 401.
+      if (provider === "openrouter") {
+        const rawKey = readCredential("openrouter").apiKey ?? "";
+        const apiKey = cleanProviderSecret(rawKey);
+        if (!apiKey.startsWith("sk-or-")) {
+          toast.error(
+            "OpenRouter: Providers → Rimuovi → incolla solo sk-or-v1-… (senza OPENROUTER_API_KEY=) → Salva.",
+          );
+          sawError = true;
+        } else {
+          if (agent) {
+            toast.message("Su Lovable, OpenRouter va in chat diretta: Agent OFF automatico per questo messaggio.");
+          }
+          await streamOpenRouterChat({
+            apiKey,
+            model,
+            messages: history,
+            system:
+              "Sei ZAnto.AI. Rispondi in italiano se l'utente scrive in italiano. Sii breve e concreto.",
+            handlers,
+            signal: controller.signal,
+          });
+        }
+      } else {
+        await streamChat(
+          {
+            workspaceId,
+            ownerKey: getGuestKey(),
+            provider,
+            model,
+            mode,
+            agent,
+            allowedTools,
+            credential: readCredential(provider),
+            mediaCredential: readCredential("google"),
+            memory: memory
+              .slice(0, 10)
+              .map((note) => `- ${note.label}: ${note.body}`)
+              .join("\n"),
+            messages: history,
+          },
+          handlers,
+          controller.signal,
+        );
+      }
 
       if (!sawError && !assembled.trim() && collected.length === 0) {
         toast.error(
-          "Nessuna risposta da Gemini. Controlla la API key in Providers e riprova (Agent spento).",
+          "Nessuna risposta dal modello. Controlla la API key in Providers e riprova (Agent spento).",
         );
       }
     } catch (error) {
