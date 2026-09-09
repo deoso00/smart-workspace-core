@@ -15,6 +15,20 @@ import {
   writeCredential,
 } from "@/lib/zanto/providers";
 
+function cleanProviderSecret(raw: string): string {
+  let key = raw.trim().replace(/^\uFEFF/, "");
+  const envLine = key.match(/^[A-Z][A-Z0-9_]*=(.*)$/s);
+  if (envLine) key = envLine[1].trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
+  }
+  if (/^bearer\s+/i.test(key)) key = key.replace(/^bearer\s+/i, "").trim();
+  return key.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
 export const Route = createFileRoute("/providers")({
   head: () => ({
     meta: [
@@ -163,16 +177,11 @@ function CredentialForm({
             toast.error("Incolla di nuovo la chiave intera (non i puntini ••••), poi Salva.");
             return;
           }
-          let cleaned = value.trim();
-          if (
-            (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
-            (cleaned.startsWith("'") && cleaned.endsWith("'"))
-          ) {
-            cleaned = cleaned.slice(1, -1).trim();
-          }
-          if (/^bearer\s+/i.test(cleaned)) cleaned = cleaned.replace(/^bearer\s+/i, "").trim();
+          const cleaned = cleanProviderSecret(value);
           if (providerId === "openrouter" && !cleaned.startsWith("sk-or-")) {
-            toast.error("Chiave OpenRouter non valida: deve iniziare con sk-or- (da openrouter.ai/keys).");
+            toast.error(
+              "In Providers incolla SOLO la chiave (sk-or-v1-...), senza OPENROUTER_API_KEY=",
+            );
             return;
           }
           writeCredential(providerId, local ? { baseUrl: cleaned } : { apiKey: cleaned });

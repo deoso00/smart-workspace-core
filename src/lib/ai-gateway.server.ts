@@ -20,9 +20,12 @@ export function createLovableAiGatewayProvider(apiKey: string) {
   });
 }
 
-/** Strip quotes / accidental "Bearer " prefix from pasted or .env keys. */
+/** Strip quotes / accidental "Bearer " / env-line prefixes from pasted or .env keys. */
 export function sanitizeApiKey(raw: string): string {
-  let key = raw.trim();
+  let key = raw.trim().replace(/^\uFEFF/, "");
+  // Full .env line pasted into Providers: OPENROUTER_API_KEY=sk-or-v1-...
+  const envLine = key.match(/^[A-Z][A-Z0-9_]*=(.*)$/s);
+  if (envLine) key = envLine[1].trim();
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
     (key.startsWith("'") && key.endsWith("'"))
@@ -30,6 +33,8 @@ export function sanitizeApiKey(raw: string): string {
     key = key.slice(1, -1).trim();
   }
   if (/^bearer\s+/i.test(key)) key = key.replace(/^bearer\s+/i, "").trim();
+  // Invisible junk from copy/paste
+  key = key.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
   return key;
 }
 
