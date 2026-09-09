@@ -101,7 +101,12 @@ export function FileExplorer({
   const save = useMutation({
     mutationFn: async () => {
       if (!selected) return;
-      await writeFile(workspaceId, selected.path, draft);
+      localVfsWrite(workspaceId, selected.path, draft);
+      try {
+        await writeFile(workspaceId, selected.path, draft);
+      } catch {
+        /* local already saved */
+      }
     },
     onSuccess: () => {
       invalidate();
