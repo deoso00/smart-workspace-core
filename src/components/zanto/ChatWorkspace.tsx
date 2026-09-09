@@ -62,11 +62,15 @@ export function ChatWorkspace() {
     desktop
       ? "llama3.2:1b"
       : onLovableHost
-        ? "poolside/laguna-s-2.1:free"
+        ? "openrouter/free"
         : "gemini-3.7-flash",
   );
   const [mode, setMode] = useState(desktop ? "LOCAL" : "AUTO");
   const [agent, setAgent] = useState(false);
+
+  useEffect(() => {
+    if (provider === "openrouter" && agent) setAgent(false);
+  }, [provider, agent]);
 
   useEffect(() => {
     if (/veo|flash-image|image-generation/i.test(model)) {

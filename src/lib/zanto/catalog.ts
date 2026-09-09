@@ -104,9 +104,9 @@ export const PROVIDERS: ProviderInfo[] = [
       "Gratis (modelli :free). Su Lovable metti OPENROUTER_API_KEY nel .env. Limite tipico ~50 req/giorno.",
     models: [
       {
-        id: "poolside/laguna-s-2.1:free",
-        label: "Laguna S 2.1 (free)",
-        note: "Coding agent — migliore per app",
+        id: "openrouter/free",
+        label: "Free router (consigliato)",
+        note: "Sceglie un free disponibile — più stabile",
       },
       {
         id: "cohere/north-mini-code:free",
@@ -114,14 +114,14 @@ export const PROVIDERS: ProviderInfo[] = [
         note: "Coding agent leggero",
       },
       {
+        id: "poolside/laguna-s-2.1:free",
+        label: "Laguna S 2.1 (free)",
+        note: "Coding — a volte saturo",
+      },
+      {
         id: "poolside/laguna-xs-2.1:free",
         label: "Laguna XS 2.1 (free)",
         note: "Coding più veloce",
-      },
-      {
-        id: "openrouter/free",
-        label: "Free router",
-        note: "Sceglie un modello free a caso",
       },
     ],
   },

@@ -101,7 +101,7 @@ function formatChatError(error: unknown): string {
     return "Crediti Lovable AI Gateway esauriti. In ZAnto: Agent OFF + Flash Lite, oppure passa a Gemini diretto / OpenRouter / Ollama. I crediti Build (chat editor Lovable) sono un altro bilancio.";
   }
   if (detail.includes("provider returned error") || detail.includes("failed after")) {
-    return "OpenRouter/provider ha rifiutato la richiesta Agent (spesso modello free saturo o tool call fallita). Riprova, oppure passa a North Mini Code / Gemini.";
+    return "Modello free OpenRouter saturo. Spegni Agent, prova Free router / North Mini Code, o riprova tra un minuto.";
   }
   if (body && body.length < 400) return `${raw}: ${body}`;
   return raw;

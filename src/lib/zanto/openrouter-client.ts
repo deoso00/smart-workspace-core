@@ -6,6 +6,27 @@ import type { StreamHandlers } from "./chat-client";
 
 type OpenRouterMessage = { role: "user" | "assistant" | "system"; content: string };
 
+const FALLBACK_MODELS = [
+  "openrouter/free",
+  "cohere/north-mini-code:free",
+  "poolside/laguna-xs-2.1:free",
+  "poolside/laguna-s-2.1:free",
+];
+
+export function humanizeOpenRouterError(raw: string): string {
+  const detail = raw.toLowerCase();
+  if (detail.includes("provider returned error") || detail.includes("no endings") || detail.includes("timed out")) {
+    return "Modello free OpenRouter saturo o offline. Prova North Mini Code, Free router, oppure riprova tra 1 minuto (Agent OFF).";
+  }
+  if (detail.includes("rate limit") || detail.includes("429")) {
+    return "Limite OpenRouter raggiunto. Aspetta un minuto o cambia modello free.";
+  }
+  if (detail.includes("401") || detail.includes("403") || detail.includes("user not found") || detail.includes("invalid")) {
+    return "OpenRouter rifiuta la chiave. Providers → Rimuovi → incolla sk-or-v1-… da openrouter.ai/keys → Salva → Testa chiave.";
+  }
+  return raw;
+}
+
 export async function probeOpenRouterKey(apiKey: string): Promise<{ ok: boolean; detail: string }> {
   try {
     const res = await fetch("https://openrouter.ai/api/v1/models", {
@@ -15,7 +36,7 @@ export async function probeOpenRouterKey(apiKey: string): Promise<{ ok: boolean;
     const body = await res.text().catch(() => "");
     return {
       ok: false,
-      detail: `OpenRouter ${res.status}: ${body.slice(0, 180) || res.statusText}`,
+      detail: humanizeOpenRouterError(`OpenRouter ${res.status}: ${body.slice(0, 180) || res.statusText}`),
     };
   } catch (error) {
     return {
@@ -25,18 +46,13 @@ export async function probeOpenRouterKey(apiKey: string): Promise<{ ok: boolean;
   }
 }
 
-export async function streamOpenRouterChat(opts: {
+async function streamOnce(opts: {
   apiKey: string;
   model: string;
   messages: OpenRouterMessage[];
-  system?: string;
   handlers: StreamHandlers;
   signal: AbortSignal;
-}): Promise<void> {
-  const messages = opts.system
-    ? [{ role: "system" as const, content: opts.system }, ...opts.messages]
-    : opts.messages;
-
+}): Promise<{ ok: boolean; error?: string; gotText: boolean }> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -48,7 +64,7 @@ export async function streamOpenRouterChat(opts: {
     },
     body: JSON.stringify({
       model: opts.model,
-      messages,
+      messages: opts.messages,
       stream: true,
     }),
     signal: opts.signal,
@@ -65,22 +81,15 @@ export async function streamOpenRouterChat(opts: {
     } catch {
       if (body) message = `${message}: ${body.slice(0, 240)}`;
     }
-    if (res.status === 401 || res.status === 403) {
-      message =
-        "OpenRouter rifiuta la chiave (401). Crea una chiave nuova su https://openrouter.ai/keys, Providers → Rimuovi → incolla solo sk-or-v1-… → Salva.";
-    }
-    opts.handlers.onError(message);
-    return;
+    return { ok: false, error: message, gotText: false };
   }
 
-  if (!res.body) {
-    opts.handlers.onError("OpenRouter: risposta vuota");
-    return;
-  }
+  if (!res.body) return { ok: false, error: "OpenRouter: risposta vuota", gotText: false };
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let gotText = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -95,18 +104,75 @@ export async function streamOpenRouterChat(opts: {
       if (!payload || payload === "[DONE]") continue;
       try {
         const json = JSON.parse(payload) as {
-          choices?: { delta?: { content?: string } }[];
+          choices?: { delta?: { content?: string }; finish_reason?: string | null }[];
           error?: { message?: string };
         };
         if (json.error?.message) {
-          opts.handlers.onError(json.error.message);
-          return;
+          return { ok: false, error: json.error.message, gotText };
         }
         const delta = json.choices?.[0]?.delta?.content;
-        if (delta) opts.handlers.onText(delta);
+        if (delta) {
+          gotText = true;
+          opts.handlers.onText(delta);
+        }
       } catch {
         /* ignore partial SSE */
       }
     }
   }
+
+  return { ok: true, gotText };
+}
+
+export async function streamOpenRouterChat(opts: {
+  apiKey: string;
+  model: string;
+  messages: OpenRouterMessage[];
+  system?: string;
+  handlers: StreamHandlers;
+  signal: AbortSignal;
+}): Promise<void> {
+  const messages = opts.system
+    ? [{ role: "system" as const, content: opts.system }, ...opts.messages]
+    : opts.messages;
+
+  const tried = new Set<string>();
+  const queue = [opts.model, ...FALLBACK_MODELS.filter((m) => m !== opts.model)];
+
+  let lastError = "OpenRouter non ha risposto";
+  for (const model of queue) {
+    if (tried.has(model)) continue;
+    tried.add(model);
+    if (opts.signal.aborted) return;
+
+    const result = await streamOnce({
+      apiKey: opts.apiKey,
+      model,
+      messages,
+      handlers: opts.handlers,
+      signal: opts.signal,
+    });
+
+    if (result.ok && result.gotText) {
+      if (model !== opts.model) {
+        // Soft notice via text prefix would be odd; toast is handled by caller if needed.
+      }
+      return;
+    }
+
+    if (result.ok && !result.gotText) {
+      lastError = `Modello ${model} ha chiuso senza testo (spesso free saturo).`;
+      continue;
+    }
+
+    lastError = result.error ?? lastError;
+    const soft =
+      /provider returned error|rate limit|429|timeout|unavailable|no endings/i.test(lastError);
+    if (!soft) {
+      opts.handlers.onError(humanizeOpenRouterError(lastError));
+      return;
+    }
+  }
+
+  opts.handlers.onError(humanizeOpenRouterError(lastError));
 }
