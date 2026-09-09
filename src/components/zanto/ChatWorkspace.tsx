@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MODES, PROVIDERS, TOOLS, getProvider } from "@/lib/zanto/catalog";
 import { streamChat, type ToolActivity } from "@/lib/zanto/chat-client";
 import { streamOpenRouterChat } from "@/lib/zanto/openrouter-client";
+import { streamOpenRouterAgent } from "@/lib/zanto/openrouter-agent";
 import { cleanProviderSecret, isProviderConfigured, readCredential } from "@/lib/zanto/providers";
 import {
   addMessage,
@@ -223,21 +224,30 @@ export function ChatWorkspace() {
       };
 
       const openRouterKey = cleanProviderSecret(readCredential("openrouter").apiKey ?? "");
-      // Chat semplice OpenRouter: dal browser (su Lovable il server toglie Authorization).
-      // Agent ON: passa dal server così funzionano i tool (serve chiave anche in Providers).
-      if (provider === "openrouter" && !agent) {
+      // OpenRouter sempre dal browser su Lovable (server toglie Authorization).
+      // Agent ON → tool VFS nel client; Agent OFF → chat semplice.
+      if (provider === "openrouter") {
         if (!openRouterKey.startsWith("sk-or-")) {
           toast.error(
             "OpenRouter: Providers → Rimuovi → incolla solo sk-or-v1-… → Salva → Testa chiave.",
           );
           sawError = true;
+        } else if (agent) {
+          await streamOpenRouterAgent({
+            apiKey: openRouterKey,
+            model,
+            workspaceId,
+            messages: history,
+            handlers,
+            signal: controller.signal,
+          });
         } else {
           await streamOpenRouterChat({
             apiKey: openRouterKey,
             model,
             messages: history,
             system:
-              "Sei ZAnto.AI. Rispondi in italiano se l'utente scrive in italiano. Sii breve e concreto.",
+              "Sei ZAnto.AI. Rispondi in italiano. Se l'utente chiede di creare file, digli di attivare Agent (toggle) e riprovare — non inventare comandi bash.",
             handlers,
             signal: controller.signal,
           });
@@ -252,10 +262,7 @@ export function ChatWorkspace() {
             mode,
             agent,
             allowedTools,
-            credential:
-              provider === "openrouter"
-                ? { apiKey: openRouterKey || readCredential(provider).apiKey }
-                : readCredential(provider),
+            credential: readCredential(provider),
             mediaCredential: readCredential("google"),
             memory: memory
               .slice(0, 10)
@@ -518,7 +525,7 @@ export function ChatWorkspace() {
                       toast.message("Agent su Lovable brucia crediti Run (fino a 4 step a messaggio). Usalo solo per i file.");
                     }
                     if (value && provider === "openrouter") {
-                      toast.message("Agent ON con OpenRouter: tool via server. Se fallisce su Lovable, spegni Agent (chat browser).");
+                      toast.message("Agent ON: userà vfs_write nel browser. Poi chiedi: crea /ciao.txt con ciao");
                     }
                     setAgent(value);
                     if (convoId) void updateConversation(convoId, { agent_enabled: value });
