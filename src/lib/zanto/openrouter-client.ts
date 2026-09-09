@@ -6,22 +6,76 @@ import type { StreamHandlers } from "./chat-client";
 
 type OpenRouterMessage = { role: "user" | "assistant" | "system"; content: string };
 
-/** One quick fallback only — long chains felt like endless "sto pensando". */
-const FALLBACK_MODELS = ["openrouter/free", "cohere/north-mini-code:free"];
+/** Rotate across free models when one provider is saturated (not for account daily quota). */
+const FALLBACK_MODELS = [
+  "openrouter/free",
+  "cohere/north-mini-code:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "google/gemma-3-4b-it:free",
+  "qwen/qwen3-4b:free",
+];
 
-const ATTEMPT_MS = 35_000;
+const ATTEMPT_MS = 40_000;
+
+function isAccountQuotaError(raw: string): boolean {
+  const d = raw.toLowerCase();
+  return (
+    /\b429\b/.test(d) ||
+    d.includes("rate limit") ||
+    d.includes("rate-limit") ||
+    d.includes("too many requests") ||
+    d.includes("free-models-per-day") ||
+    d.includes("free_models_per_day") ||
+    d.includes("daily limit") ||
+    d.includes("requests per day") ||
+    d.includes("key limit") ||
+    (d.includes("quota") && d.includes("free"))
+  );
+}
+
+function isProviderSaturated(raw: string): boolean {
+  const d = raw.toLowerCase();
+  return (
+    d.includes("provider returned error") ||
+    d.includes("no endings") ||
+    d.includes("no available provider") ||
+    d.includes("unavailable") ||
+    d.includes("capacity") ||
+    d.includes("overloaded") ||
+    d.includes("timed out") ||
+    d.includes("timeout")
+  );
+}
 
 export function humanizeOpenRouterError(raw: string): string {
   const detail = raw.toLowerCase();
-  if (detail.includes("provider returned error") || detail.includes("no endings") || detail.includes("timed out") || detail.includes("aborted")) {
-    return "Modello free OpenRouter saturo o lento. Prova North Mini Code / Free router, oppure riprova tra 1 minuto.";
+
+  if (isAccountQuotaError(raw)) {
+    return (
+      "Limite OpenRouter FREE esaurito (~50 richieste/giorno, condiviso da TUTTI i modelli free). " +
+      "Cambiare modello free NON serve. Aspetta il reset (mezzanotte UTC), oppure: " +
+      "Agent OFF + meno messaggi, Ollama sul PC, Gemini diretto, o ricarica ≥$10 su openrouter.ai per alzare il tetto a ~1000/giorno. " +
+      "Nota: Agent ON e i retry contano come più richieste."
+    );
   }
-  if (detail.includes("rate limit") || detail.includes("429")) {
-    return "Limite OpenRouter raggiunto. Aspetta un minuto o cambia modello free.";
+
+  if (isProviderSaturated(raw) || detail.includes("aborted")) {
+    return (
+      "Quel modello free è saturo in questo momento. Prova Free router, oppure Ollama / Gemini. " +
+      "Se succede con tutti i free, probabilmente hai finito le 50 req/giorno."
+    );
   }
-  if (detail.includes("401") || detail.includes("403") || detail.includes("user not found") || detail.includes("invalid")) {
+
+  if (
+    detail.includes("401") ||
+    detail.includes("403") ||
+    detail.includes("user not found") ||
+    detail.includes("invalid") ||
+    detail.includes("unauthorized")
+  ) {
     return "OpenRouter rifiuta la chiave. Providers → Rimuovi → incolla sk-or-v1-… → Salva → Testa chiave.";
   }
+
   return raw;
 }
 
@@ -44,6 +98,51 @@ export async function probeOpenRouterKey(apiKey: string): Promise<{ ok: boolean;
   }
 }
 
+/** Optional: read remaining free quota from OpenRouter key endpoint. */
+export async function probeOpenRouterQuota(
+  apiKey: string,
+): Promise<{ ok: boolean; label: string }> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/key", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      return { ok: false, label: humanizeOpenRouterError(`OpenRouter ${res.status}`) };
+    }
+    const json = (await res.json()) as {
+      data?: {
+        limit_remaining?: number | null;
+        usage?: number;
+        limit?: number | null;
+        is_free_tier?: boolean;
+      };
+    };
+    const data = json.data;
+    if (!data) return { ok: true, label: "Chiave OK" };
+    const rem = data.limit_remaining;
+    if (typeof rem === "number") {
+      return {
+        ok: rem > 0,
+        label:
+          rem <= 0
+            ? "Credito/limite chiave esaurito su OpenRouter"
+            : `Chiave OK · rimanente ~${rem.toFixed(4)}`,
+      };
+    }
+    return {
+      ok: true,
+      label: data.is_free_tier
+        ? "Chiave OK · piano free (~50 req/giorno totali sui modelli :free)"
+        : "Chiave OK",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      label: error instanceof Error ? error.message : "Impossibile leggere quota OpenRouter",
+    };
+  }
+}
+
 function mergeSignals(parent: AbortSignal, ms: number): { signal: AbortSignal; cancel: () => void } {
   const local = new AbortController();
   const timer = setTimeout(() => local.abort(), ms);
@@ -62,7 +161,7 @@ async function streamOnce(opts: {
   messages: OpenRouterMessage[];
   handlers: StreamHandlers;
   signal: AbortSignal;
-}): Promise<{ ok: boolean; error?: string; gotText: boolean }> {
+}): Promise<{ ok: boolean; error?: string; gotText: boolean; status?: number }> {
   const { signal, cancel } = mergeSignals(opts.signal, ATTEMPT_MS);
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -93,7 +192,7 @@ async function streamOnce(opts: {
       } catch {
         if (body) message = `${message}: ${body.slice(0, 240)}`;
       }
-      return { ok: false, error: message, gotText: false };
+      return { ok: false, error: message, gotText: false, status: res.status };
     }
 
     if (!res.body) return { ok: false, error: "OpenRouter: risposta vuota", gotText: false };
@@ -156,7 +255,10 @@ export async function streamOpenRouterChat(opts: {
     ? [{ role: "system" as const, content: opts.system }, ...opts.messages]
     : opts.messages;
 
-  const queue = [opts.model, ...FALLBACK_MODELS.filter((m) => m !== opts.model)].slice(0, 2);
+  const queue = [
+    opts.model,
+    ...FALLBACK_MODELS.filter((m) => m !== opts.model),
+  ].slice(0, 4);
 
   let lastError = "OpenRouter non ha risposto";
   for (const model of queue) {
@@ -178,8 +280,14 @@ export async function streamOpenRouterChat(opts: {
     }
 
     lastError = result.error ?? lastError;
-    const soft =
-      /provider returned error|rate limit|429|timeout|unavailable|no endings|aborted/i.test(lastError);
+
+    // Account daily/minute quota: changing free model never helps — stop immediately.
+    if (result.status === 429 || isAccountQuotaError(lastError)) {
+      opts.handlers.onError(humanizeOpenRouterError(lastError));
+      return;
+    }
+
+    const soft = isProviderSaturated(lastError) || /timeout|aborted/i.test(lastError);
     if (!soft) {
       opts.handlers.onError(humanizeOpenRouterError(lastError));
       return;

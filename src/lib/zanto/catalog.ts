@@ -101,17 +101,27 @@ export const PROVIDERS: ProviderInfo[] = [
     keyLabel: "OpenRouter API key (sk-or-...) — opzionale se già in .env",
     docs: "https://openrouter.ai/keys",
     description:
-      "Gratis (modelli :free). Su Lovable metti OPENROUTER_API_KEY nel .env. Limite tipico ~50 req/giorno.",
+      "Modelli :free: ~50 richieste/GIORNO totali (non per modello). Agent ON le brucia in fretta. Se dice limite su tutti i modelli: usa Ollama (PC), Gemini, o ricarica ≥$10 su OpenRouter (~1000/giorno). Cambiare free non serve.",
     models: [
       {
         id: "openrouter/free",
         label: "Free router (consigliato)",
-        note: "Sceglie un free disponibile — più stabile",
+        note: "Sceglie un free disponibile",
       },
       {
         id: "cohere/north-mini-code:free",
         label: "North Mini Code (free)",
         note: "Coding agent leggero",
+      },
+      {
+        id: "meta-llama/llama-3.3-70b-instruct:free",
+        label: "Llama 3.3 70B (free)",
+        note: "Più capace — stesso tetto giornaliero",
+      },
+      {
+        id: "google/gemma-3-4b-it:free",
+        label: "Gemma 3 4B (free)",
+        note: "Leggero",
       },
       {
         id: "poolside/laguna-s-2.1:free",

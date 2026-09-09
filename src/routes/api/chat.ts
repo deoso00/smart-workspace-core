@@ -72,19 +72,29 @@ function formatChatError(error: unknown): string {
   const detail = `${raw} ${body}`.toLowerCase();
 
   if (
+    detail.includes("free-models-per-day") ||
+    detail.includes("free_models_per_day") ||
+    ((status === 429 || detail.includes("rate limit") || detail.includes("too many requests")) &&
+      (detail.includes("openrouter") || detail.includes("free model") || detail.includes(":free")))
+  ) {
+    return "Limite OpenRouter FREE (~50/giorno su tutti i :free). Cambiare modello free NON aiuta. Agent OFF, Ollama sul PC, Gemini, o ricarica ≥$10 su openrouter.ai.";
+  }
+  if (detail.includes("provider returned error") || detail.includes("failed after")) {
+    return "Modello free OpenRouter saturo. Se lo vedi su TUTTI i modelli: hai finito le ~50 req/giorno (cambia free non serve). Usa Ollama/Gemini o aspetta il reset.";
+  }
+  if (
     detail.includes("quota") ||
-    detail.includes("rate limit") ||
     detail.includes("resource_exhausted") ||
     detail.includes("limit: 0") ||
-    status === 429
+    (status === 429 && (detail.includes("gemini") || detail.includes("google")))
   ) {
     return "Quota Gemini esaurita o modello media non disponibile in chat. Usa Media Studio per le immagini; per la chat tieni Gemini 3.7 Flash / OpenRouter / Ollama.";
   }
   if (detail.includes("not found") && detail.includes("veo")) {
     return "Veo non è un modello chat. Usa Media Studio → Genera video (serve billing Google).";
   }
-  if (status === 429 || /\b429\b/.test(raw) || detail.includes("rate limit") || detail.includes("resource_exhausted")) {
-    return "Limite di richieste raggiunto (rate limit). Aspetta un minuto e riprova, o cambia modello.";
+  if (status === 429 || /\b429\b/.test(raw) || detail.includes("rate limit") || detail.includes("too many requests")) {
+    return "Limite richieste (429). Su OpenRouter free: ~50/giorno totali — cambiare modello free non serve. Usa Ollama/Gemini o aspetta.";
   }
   if (
     status === 401 ||
@@ -104,13 +114,9 @@ function formatChatError(error: unknown): string {
     detail.includes("switch") ||
     detail.includes("use another") ||
     detail.includes("try another model") ||
-    detail.includes("model not available") ||
-    detail.includes("not available")
+    detail.includes("model not available")
   ) {
     return "Lovable AI non disponibile su questo modello/piano. Seleziona OpenRouter (Free router / North Mini) oppure Gemini diretto — non serve riscrivere il prompt.";
-  }
-  if (detail.includes("provider returned error") || detail.includes("failed after")) {
-    return "Modello free OpenRouter saturo. Spegni Agent, prova Free router / North Mini Code, o riprova tra un minuto.";
   }
   if (body && body.length < 400) return `${raw}: ${body}`;
   return raw;

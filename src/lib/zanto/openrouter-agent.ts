@@ -167,6 +167,7 @@ export async function streamOpenRouterAgent(opts: {
 
     const bodyText = await res.text().catch(() => "");
     if (!res.ok) {
+      // Account quota: don't burn more steps retrying the same free key.
       opts.handlers.onError(humanizeOpenRouterError(bodyText || `OpenRouter ${res.status}`));
       return;
     }

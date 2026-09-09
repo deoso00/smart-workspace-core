@@ -593,6 +593,17 @@ export function ChatWorkspace() {
           </div>
         )}
 
+        {provider === "openrouter" && (
+          <div className="flex items-start gap-2 border-b border-border bg-amber-500/10 px-4 py-2 text-xs">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+            <span>
+              OpenRouter free: ~<strong>50 msg/giorno</strong> in totale (tutti i modelli :free insieme).
+              Se il limite compare su tutti, <strong>non cambiare modello</strong> — spegni Agent, usa{" "}
+              <strong>Ollama</strong> (PC) / <strong>Gemini</strong>, o aspetta il reset.
+            </span>
+          </div>
+        )}
+
         {lastDoneSummary && !busy && (
           <div className="flex items-center gap-2 border-b border-border bg-emerald-500/10 px-4 py-2 text-xs">
             <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
