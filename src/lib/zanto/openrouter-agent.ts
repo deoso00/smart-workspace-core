@@ -83,7 +83,7 @@ const OPENROUTER_TOOLS = [
   },
 ] as const;
 
-const MAX_STEPS = 4;
+const MAX_STEPS = 8;
 
 async function runTool(
   name: string,
@@ -255,5 +255,7 @@ export async function streamOpenRouterAgent(opts: {
     }
   }
 
-  opts.handlers.onText("\n(Agent: raggiunto il limite di step. Se serve, ripeti la richiesta.)");
+  opts.handlers.onText(
+    "\n\n⚠️ Creazione incompleta: raggiunto il limite di step Agent. Controlla i file a sinistra: se manca qualcosa, invia «continua» (non serve riscrivere tutto il prompt).",
+  );
 }

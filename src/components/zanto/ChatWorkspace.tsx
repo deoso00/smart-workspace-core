@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Bot,
+  CheckCircle2,
+  Eye,
   Loader2,
   Plus,
   SendHorizontal,
@@ -49,7 +51,7 @@ import { getGuestKey } from "@/lib/zanto/guest";
 import { useWorkspace } from "@/lib/zanto/workspace-context";
 import { FileExplorer } from "./FileExplorer";
 import { MediaStudio } from "./MediaStudio";
-
+import { PreviewPanel } from "./PreviewPanel";
 export function ChatWorkspace() {
   const { activeId: workspaceId, loading, error: workspaceError, retry } = useWorkspace();
   const queryClient = useQueryClient();
@@ -83,6 +85,10 @@ export function ChatWorkspace() {
   const [streamText, setStreamText] = useState("");
   const [tools, setTools] = useState<ToolActivity[]>([]);
   const [busy, setBusy] = useState(false);
+  const [runStatus, setRunStatus] = useState<"idle" | "thinking" | "working" | "done" | "incomplete">("idle");
+  const [lastDoneSummary, setLastDoneSummary] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewRefresh, setPreviewRefresh] = useState(0);
   const [ollamaLiveModels, setOllamaLiveModels] = useState<ModelInfo[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -199,6 +205,13 @@ export function ChatWorkspace() {
     abortRef.current?.abort();
     abortRef.current = null;
     setBusy(false);
+    setRunStatus("incomplete");
+    setLastDoneSummary("Interrotto. I file già scritti restano a sinistra — puoi scrivere «continua».");
+  };
+
+  const openPreview = () => {
+    setPreviewOpen(true);
+    setPreviewRefresh((n) => n + 1);
   };
 
   const send = async () => {
@@ -236,6 +249,8 @@ export function ChatWorkspace() {
     setTools([]);
     setStreamText("");
     setBusy(true);
+    setRunStatus("thinking");
+    setLastDoneSummary(null);
 
     const history = [
       ...messages.map((m) => ({
@@ -254,6 +269,7 @@ export function ChatWorkspace() {
     const timeoutMs = provider === "ollama" ? (agent ? 180_000 : 90_000) : agent ? 120_000 : 45_000;
     const timeoutId = window.setTimeout(() => {
       controller.abort();
+      setInput((prev) => prev || text);
       toast.error(
         provider === "ollama"
           ? "Timeout Ollama. I modelli 7B sul PC sono lenti: attendi o usa llama3.2:1b / OpenRouter."
@@ -287,9 +303,11 @@ export function ChatWorkspace() {
           if (idx >= 0) collected[idx] = activity;
           else collected.push(activity);
           setTools([...collected]);
+          setRunStatus("working");
         },
         onError: (message: string) => {
           sawError = true;
+          setInput((prev) => prev || text);
           toast.error(message);
         },
       };
@@ -303,6 +321,7 @@ export function ChatWorkspace() {
             "OpenRouter: Providers → Rimuovi → incolla solo sk-or-v1-… → Salva → Testa chiave.",
           );
           sawError = true;
+          setInput(text);
         } else if (agent) {
           await streamOpenRouterAgent({
             apiKey: openRouterKey,
@@ -347,12 +366,16 @@ export function ChatWorkspace() {
       }
 
       if (!sawError && !assembled.trim() && collected.length === 0 && !controller.signal.aborted) {
+        setInput((prev) => prev || text);
         toast.error(
           "Nessuna risposta dal modello. Prova Free router / North Mini, Agent OFF, o Stop e riprova.",
         );
       }
     } catch (error) {
-      if ((error as Error).name !== "AbortError") toast.error((error as Error).message);
+      if ((error as Error).name !== "AbortError") {
+        setInput((prev) => prev || text);
+        toast.error((error as Error).message);
+      }
     } finally {
       window.clearTimeout(timeoutId);
       if (assembled.trim() || collected.length > 0) {
@@ -372,6 +395,40 @@ export function ChatWorkspace() {
           toast.message("Risposta ricevuta ma salvataggio lento (Supabase).");
         }
       }
+
+      const writes = collected.filter(
+        (t) => t.name === "vfs_write" && t.status === "done",
+      );
+      const incomplete =
+        /creazione incompleta|limite di step/i.test(assembled) || controller.signal.aborted;
+      if (writes.length > 0) {
+        const paths = writes
+          .map((t) => {
+            const inputObj = t.input as { path?: string } | undefined;
+            return inputObj?.path;
+          })
+          .filter(Boolean) as string[];
+        const hasHtml = paths.some((p) => /\.html?$/i.test(p));
+        setRunStatus(incomplete ? "incomplete" : "done");
+        setLastDoneSummary(
+          incomplete
+            ? `Scritti ${writes.length} file, ma il giro Agent non è completo. Scrivi «continua» senza rifare tutto il prompt.`
+            : `Creazione finita · ${writes.length} file${paths.length ? `: ${paths.slice(0, 4).join(", ")}` : ""}${hasHtml ? " · Anteprima disponibile" : ""}`,
+        );
+        if (hasHtml) {
+          setPreviewOpen(true);
+          setPreviewRefresh((n) => n + 1);
+          toast.success("File pronti — anteprima aperta a destra.");
+        } else {
+          toast.success("Creazione finita. Controlla i file a sinistra.");
+        }
+      } else if (!sawError && !controller.signal.aborted) {
+        setRunStatus("done");
+        setLastDoneSummary("Risposta completa.");
+      } else if (controller.signal.aborted) {
+        setRunStatus("incomplete");
+      }
+
       setStreamText("");
       setBusy(false);
       abortRef.current = null;
@@ -483,7 +540,37 @@ export function ChatWorkspace() {
               Agent
             </Badge>
           )}
-          {busy && <Loader2 className="ml-auto size-3.5 animate-spin text-primary" />}
+          {busy && runStatus === "thinking" && (
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin text-primary" /> Sto pensando…
+            </span>
+          )}
+          {busy && runStatus === "working" && (
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+              Sto creando… {tools.filter((t) => t.status === "done").length}/{Math.max(tools.length, 1)} tool
+            </span>
+          )}
+          {!busy && runStatus === "done" && (
+            <span className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-3.5" /> Finito
+            </span>
+          )}
+          {!busy && runStatus === "incomplete" && (
+            <span className="text-[11px] text-amber-600 dark:text-amber-400">Incompleto — scrivi «continua»</span>
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              size="sm"
+              variant={previewOpen ? "secondary" : "ghost"}
+              className="h-7 gap-1 px-2 text-[11px]"
+              onClick={() => (previewOpen ? setPreviewOpen(false) : openPreview())}
+            >
+              <Eye className="size-3.5" />
+              Anteprima
+            </Button>
+            {busy && <Loader2 className="size-3.5 animate-spin text-primary" />}
+          </div>
         </div>
 
         {!configured && (
@@ -495,6 +582,27 @@ export function ChatWorkspace() {
           </div>
         )}
 
+        {provider === "lovable" && (
+          <div className="flex items-start gap-2 border-b border-border bg-amber-500/10 px-4 py-2 text-xs">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+            <span>
+              Se Lovable AI dice di passare ad altri modelli, i crediti <strong>Run/Gateway</strong> sono
+              finiti (non i Build dell&apos;editor). Usa <strong>OpenRouter</strong> o{" "}
+              <strong>Ollama</strong> — non è un bug della chat.
+            </span>
+          </div>
+        )}
+
+        {lastDoneSummary && !busy && (
+          <div className="flex items-center gap-2 border-b border-border bg-emerald-500/10 px-4 py-2 text-xs">
+            <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+            <span className="min-w-0 flex-1">{lastDoneSummary}</span>
+            <Button size="sm" variant="outline" className="h-6 shrink-0 text-[10px]" onClick={openPreview}>
+              Apri anteprima
+            </Button>
+          </div>
+        )}
+
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
           <div className="mx-auto max-w-2xl space-y-4">
             {messages.length === 0 && !streamText && (
@@ -502,7 +610,9 @@ export function ChatWorkspace() {
                 <p className="font-display text-base font-semibold text-foreground">
                   Cosa vuoi costruire?
                 </p>
-                <p className="mt-1">Scrivi sotto. I file del progetto sono a sinistra.</p>
+                <p className="mt-1">
+                  Agent ON → crea file. Poi Anteprima a destra (URL localhost sul desktop).
+                </p>
               </div>
             )}
             {messages.map((message) => (
@@ -531,7 +641,11 @@ export function ChatWorkspace() {
                     void send();
                   }
                 }}
-                placeholder="Scrivi cosa vuoi costruire…"
+                placeholder={
+                  runStatus === "incomplete"
+                    ? "Scrivi «continua» per riprendere senza rifare tutto il prompt…"
+                    : "Scrivi cosa vuoi costruire…"
+                }
                 className="max-h-36 min-h-[48px] flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
               />
               {busy ? (
@@ -639,8 +753,28 @@ export function ChatWorkspace() {
           </div>
         </div>
       </section>
+
+      {previewOpen && (
+        <div className="hidden w-[min(42%,28rem)] shrink-0 md:flex md:flex-col lg:w-[min(46%,36rem)]">
+          <PreviewPanel
+            workspaceId={workspaceId}
+            refreshKey={previewRefresh}
+            onClose={() => setPreviewOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
+}
+
+function toolLabel(tool: ToolActivity): string {
+  const path =
+    tool.input && typeof tool.input === "object" && "path" in tool.input
+      ? String((tool.input as { path?: unknown }).path ?? "")
+      : "";
+  if (tool.name === "vfs_write" && path) return `scrive ${path}`;
+  if (tool.name === "vfs_read" && path) return `legge ${path}`;
+  return tool.name;
 }
 
 function MessageRow({
@@ -655,6 +789,7 @@ function MessageRow({
   streaming?: boolean;
 }) {
   const isUser = role === "user";
+  const running = parts.some((p) => p.status === "running");
   return (
     <div className="flex gap-3">
       <span
@@ -673,9 +808,22 @@ function MessageRow({
                 className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-xs"
               >
                 <Wrench className="size-3 text-muted-foreground" />
-                <span className="font-mono">{tool.name}</span>
-                <Badge variant="secondary" className="ml-auto text-[10px]">
-                  {tool.status}
+                <span className="min-w-0 truncate font-mono">{toolLabel(tool)}</span>
+                <Badge
+                  variant="secondary"
+                  className={`ml-auto text-[10px] ${
+                    tool.status === "done"
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                      : tool.status === "error"
+                        ? "bg-destructive/15 text-destructive"
+                        : ""
+                  }`}
+                >
+                  {tool.status === "running"
+                    ? "in corso"
+                    : tool.status === "done"
+                      ? "ok"
+                      : tool.status}
                 </Badge>
               </li>
             ))}
@@ -690,7 +838,13 @@ function MessageRow({
             {content}
             {streaming && !content && (
               <span className="inline-flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" /> sto pensando…
+                <Loader2 className="size-3.5 animate-spin" />
+                {running ? "sto creando i file…" : "sto pensando…"}
+              </span>
+            )}
+            {streaming && content && running && (
+              <span className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" /> ancora al lavoro sui file…
               </span>
             )}
           </div>

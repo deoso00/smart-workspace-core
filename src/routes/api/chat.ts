@@ -98,7 +98,16 @@ function formatChatError(error: unknown): string {
     return "Chiave API non valida. OpenRouter: Providers → Rimuovi → incolla di nuovo una chiave sk-or-v1-… da https://openrouter.ai/keys (senza spazi/virgolette), oppure metti OPENROUTER_API_KEY nel .env su GitHub.";
   }
   if (status === 402 || detail.includes("no credit") || detail.includes("payment required") || detail.includes("insufficient")) {
-    return "Crediti Lovable AI Gateway esauriti. In ZAnto: Agent OFF + Flash Lite, oppure passa a Gemini diretto / OpenRouter / Ollama. I crediti Build (chat editor Lovable) sono un altro bilancio.";
+    return "Crediti Lovable AI (Run/Gateway) esauriti — non è un bug del chat. Passa a OpenRouter (Providers → chiave gratis) o Ollama sul desktop. I crediti Build dell'editor Lovable sono un altro bilancio.";
+  }
+  if (
+    detail.includes("switch") ||
+    detail.includes("use another") ||
+    detail.includes("try another model") ||
+    detail.includes("model not available") ||
+    detail.includes("not available")
+  ) {
+    return "Lovable AI non disponibile su questo modello/piano. Seleziona OpenRouter (Free router / North Mini) oppure Gemini diretto — non serve riscrivere il prompt.";
   }
   if (detail.includes("provider returned error") || detail.includes("failed after")) {
     return "Modello free OpenRouter saturo. Spegni Agent, prova Free router / North Mini Code, o riprova tra un minuto.";

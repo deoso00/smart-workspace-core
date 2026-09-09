@@ -23,6 +23,7 @@ import { Route as ToolsRouteImport } from './routes/tools'
 import { Route as WorkspacesRouteImport } from './routes/workspaces'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiMediaRouteImport } from './routes/api/media'
+import { Route as ApiPreviewRouteImport } from './routes/api/preview'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -94,6 +95,11 @@ const ApiMediaRoute = ApiMediaRouteImport.update({
   path: '/api/media',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPreviewRoute = ApiPreviewRouteImport.update({
+  id: '/api/preview',
+  path: '/api/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/workspaces': typeof WorkspacesRoute
   '/api/chat': typeof ApiChatRoute
   '/api/media': typeof ApiMediaRoute
+  '/api/preview': typeof ApiPreviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/workspaces': typeof WorkspacesRoute
   '/api/chat': typeof ApiChatRoute
   '/api/media': typeof ApiMediaRoute
+  '/api/preview': typeof ApiPreviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/workspaces': typeof WorkspacesRoute
   '/api/chat': typeof ApiChatRoute
   '/api/media': typeof ApiMediaRoute
+  '/api/preview': typeof ApiPreviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/workspaces'
     | '/api/chat'
     | '/api/media'
+    | '/api/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/workspaces'
     | '/api/chat'
     | '/api/media'
+    | '/api/preview'
   id:
     | '__root__'
     | '/'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/workspaces'
     | '/api/chat'
     | '/api/media'
+    | '/api/preview'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -210,6 +222,7 @@ export interface RootRouteChildren {
   WorkspacesRoute: typeof WorkspacesRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiMediaRoute: typeof ApiMediaRoute
+  ApiPreviewRoute: typeof ApiPreviewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMediaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/preview': {
+      id: '/api/preview'
+      path: '/api/preview'
+      fullPath: '/api/preview'
+      preLoaderRoute: typeof ApiPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -330,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   WorkspacesRoute: WorkspacesRoute,
   ApiChatRoute: ApiChatRoute,
   ApiMediaRoute: ApiMediaRoute,
+  ApiPreviewRoute: ApiPreviewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

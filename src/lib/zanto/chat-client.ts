@@ -14,6 +14,7 @@ export type StreamHandlers = {
   onText: (delta: string) => void;
   onTool: (activity: ToolActivity) => void;
   onError: (message: string) => void;
+  onDone?: () => void;
 };
 
 export type ChatRequest = {
@@ -82,6 +83,7 @@ export async function streamChat(
           output: event["output"],
         });
       else if (event.t === "error") handlers.onError(String(event.v ?? "Errore sconosciuto"));
+      else if (event.t === "done") handlers.onDone?.();
     }
   }
 }

@@ -47,7 +47,7 @@ export const PROVIDERS: ProviderInfo[] = [
     builtInKey: true,
     runtime: "cloud",
     description:
-      "Modelli veloci via Lovable (crediti AI Gateway / Run). Consigliato: Agent OFF + Flash Lite per consumare poco. Non confondere con i crediti Build della chat editor.",
+      "Crediti AI Gateway/Run di Lovable (diversi dai crediti Build dell'editor). Se dice di passare ad altri modelli, i crediti Run sono esauriti: usa OpenRouter (gratis) o Ollama sul PC. Consigliato: Agent OFF + Flash Lite.",
     models: [
       {
         id: "google/gemini-3.1-flash-lite",

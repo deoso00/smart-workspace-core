@@ -263,3 +263,85 @@ ipcMain.handle("zanto:open-external", async (_e, url) => {
     await shell.openExternal(url);
   }
 });
+
+/** @type {import('http').Server | null} */
+let previewServer = null;
+/** @type {Map<string, string>} */
+let previewFiles = new Map();
+
+function mimeFromPath(filePath) {
+  const lower = String(filePath).toLowerCase();
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html; charset=utf-8";
+  if (lower.endsWith(".css")) return "text/css; charset=utf-8";
+  if (lower.endsWith(".js") || lower.endsWith(".mjs")) return "text/javascript; charset=utf-8";
+  if (lower.endsWith(".json")) return "application/json; charset=utf-8";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".webp")) return "image/webp";
+  return "text/plain; charset=utf-8";
+}
+
+function stopPreviewServer() {
+  if (previewServer) {
+    try {
+      previewServer.close();
+    } catch {
+      /* ignore */
+    }
+    previewServer = null;
+  }
+  previewFiles = new Map();
+}
+
+ipcMain.handle("zanto:preview-start", async (_e, files) => {
+  stopPreviewServer();
+  previewFiles = new Map();
+  if (files && typeof files === "object") {
+    for (const [rawPath, content] of Object.entries(files)) {
+      let p = String(rawPath).replace(/\\/g, "/");
+      if (!p.startsWith("/")) p = `/${p}`;
+      previewFiles.set(p, String(content ?? ""));
+    }
+  }
+
+  previewServer = http.createServer((req, res) => {
+    try {
+      const reqUrl = new URL(req.url || "/", "http://127.0.0.1");
+      let pathname = decodeURIComponent(reqUrl.pathname || "/");
+      if (pathname === "/") pathname = "/index.html";
+      const content = previewFiles.get(pathname);
+      if (content == null) {
+        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        res.end(`File non trovato: ${pathname}`);
+        return;
+      }
+      res.writeHead(200, {
+        "content-type": mimeFromPath(pathname),
+        "cache-control": "no-store",
+      });
+      res.end(content);
+    } catch (error) {
+      res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+      res.end(error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  await new Promise((resolve, reject) => {
+    previewServer.once("error", reject);
+    previewServer.listen(0, "127.0.0.1", () => resolve(undefined));
+  });
+
+  const addr = previewServer.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+  return { url: `http://127.0.0.1:${port}/`, port };
+});
+
+ipcMain.handle("zanto:preview-stop", async () => {
+  stopPreviewServer();
+});
+
+app.on("will-quit", () => {
+  stopPreviewServer();
+});
