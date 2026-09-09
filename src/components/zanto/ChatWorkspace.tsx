@@ -69,10 +69,6 @@ export function ChatWorkspace() {
   const [agent, setAgent] = useState(false);
 
   useEffect(() => {
-    if (provider === "openrouter" && agent) setAgent(false);
-  }, [provider, agent]);
-
-  useEffect(() => {
     if (/veo|flash-image|image-generation/i.test(model)) {
       setModel(getProvider(provider)?.models[0]?.id ?? "gemini-3.7-flash");
     }
@@ -206,7 +202,7 @@ export function ChatWorkspace() {
     const timeoutId = window.setTimeout(() => {
       controller.abort();
       toast.error("Timeout: il modello non ha risposto in tempo. Riprova o disattiva Agent.");
-    }, agent ? 210_000 : 90_000);
+    }, agent ? 210_000 : 60_000);
 
     try {
       const handlers = {
@@ -226,21 +222,18 @@ export function ChatWorkspace() {
         },
       };
 
-      // OpenRouter from the browser: Lovable server often strips Authorization → false 401.
-      if (provider === "openrouter") {
-        const rawKey = readCredential("openrouter").apiKey ?? "";
-        const apiKey = cleanProviderSecret(rawKey);
-        if (!apiKey.startsWith("sk-or-")) {
+      const openRouterKey = cleanProviderSecret(readCredential("openrouter").apiKey ?? "");
+      // Chat semplice OpenRouter: dal browser (su Lovable il server toglie Authorization).
+      // Agent ON: passa dal server così funzionano i tool (serve chiave anche in Providers).
+      if (provider === "openrouter" && !agent) {
+        if (!openRouterKey.startsWith("sk-or-")) {
           toast.error(
-            "OpenRouter: Providers → Rimuovi → incolla solo sk-or-v1-… (senza OPENROUTER_API_KEY=) → Salva.",
+            "OpenRouter: Providers → Rimuovi → incolla solo sk-or-v1-… → Salva → Testa chiave.",
           );
           sawError = true;
         } else {
-          if (agent) {
-            toast.message("Su Lovable, OpenRouter va in chat diretta: Agent OFF automatico per questo messaggio.");
-          }
           await streamOpenRouterChat({
-            apiKey,
+            apiKey: openRouterKey,
             model,
             messages: history,
             system:
@@ -259,7 +252,10 @@ export function ChatWorkspace() {
             mode,
             agent,
             allowedTools,
-            credential: readCredential(provider),
+            credential:
+              provider === "openrouter"
+                ? { apiKey: openRouterKey || readCredential(provider).apiKey }
+                : readCredential(provider),
             mediaCredential: readCredential("google"),
             memory: memory
               .slice(0, 10)
@@ -274,7 +270,7 @@ export function ChatWorkspace() {
 
       if (!sawError && !assembled.trim() && collected.length === 0) {
         toast.error(
-          "Nessuna risposta dal modello. Controlla la API key in Providers e riprova (Agent spento).",
+          "Nessuna risposta dal modello. Prova Free router / North Mini, Agent OFF, o Stop e riprova.",
         );
       }
     } catch (error) {
@@ -520,6 +516,9 @@ export function ChatWorkspace() {
                   onCheckedChange={(value) => {
                     if (value && provider === "lovable") {
                       toast.message("Agent su Lovable brucia crediti Run (fino a 4 step a messaggio). Usalo solo per i file.");
+                    }
+                    if (value && provider === "openrouter") {
+                      toast.message("Agent ON con OpenRouter: tool via server. Se fallisce su Lovable, spegni Agent (chat browser).");
                     }
                     setAgent(value);
                     if (convoId) void updateConversation(convoId, { agent_enabled: value });
