@@ -4,6 +4,7 @@ executableName: ZAntoAI
 copyright: Copyright © ZAnto
 directories:
   output: desktop/dist
+  buildResources: desktop/build
 files:
   - desktop/main.cjs
   - desktop/preload.cjs
@@ -19,7 +20,15 @@ win:
     - target: nsis
       arch:
         - x64
+    - target: portable
+      arch:
+        - x64
   artifactName: ZAnto-Setup-${version}.${ext}
+  # Skip rcedit/winCodeSign — often hangs forever on Windows without a cert
+  signAndEditExecutable: false
+  verifyUpdateCodeSignature: false
+portable:
+  artifactName: ZAntoAI-Portable-${version}.${ext}
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -29,6 +38,7 @@ nsis:
   installerLanguages:
     - Italian
     - English
+  artifactName: ZAnto-Setup-${version}.${ext}
 extraMetadata:
   main: desktop/main.cjs
 electronVersion: 37.2.0

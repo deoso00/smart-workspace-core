@@ -35,9 +35,17 @@ curl http://localhost:11434/api/tags
 
 ## 2. Installa ZAnto Desktop
 
-1. Esegui `ZAnto Setup x.x.x.exe`
+### Opzione A — Portable (consigliata, pronta subito)
+
+1. Apri la cartella `desktop\dist\ZAntoAI-Portable`
+2. Avvia **`ZAntoAI.exe`**
+3. Oppure estrai lo ZIP `desktop\dist\ZAntoAI-Portable-1.0.0.zip` dove vuoi
+
+### Opzione B — Installer NSIS (quando generato)
+
+1. Esegui `ZAnto-Setup-*.exe` da `desktop\dist`
 2. Completa l’installazione
-3. Avvia **ZAnto.AI** dal menu Start
+3. Avvia **ZAnto AI** dal menu Start
 
 Al primo avvio, se Ollama non è attivo, compare una guida con i passi sopra.
 
@@ -76,14 +84,20 @@ Prerequisiti: [Bun](https://bun.sh), Node.js 20+.
 
 ```bat
 bun install
-bun run desktop:build
-bun run desktop:dist
+bun run desktop:pack
 ```
 
 Output:
 
-- installer in `desktop\dist\ZAnto Setup *.exe`
-- server in `desktop\.output`
+- cartella eseguibile: `desktop\dist\ZAntoAI-Portable\ZAntoAI.exe`
+- ZIP: `desktop\dist\ZAntoAI-Portable-1.0.0.zip`
+- (opzionale) installer NSIS: `bun run desktop:dist` → `desktop\dist\ZAnto-Setup-*.exe`
+
+Solo server (senza pack):
+
+```bat
+bun run desktop:build
+```
 
 Dev (dopo `desktop:build`):
 

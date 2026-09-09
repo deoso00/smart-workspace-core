@@ -14,9 +14,11 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "desktop:build": "desktop\\build-server.cmd",
+    "desktop:build": "cmd /c desktop\\build-server.cmd",
     "desktop:dev": "electron .",
-    "desktop:dist": "electron-builder --win nsis --config desktop/electron-builder.yml",
+    "desktop:dist": "electron-builder --win --config desktop/electron-builder.yml",
+    "desktop:portable": "powershell -ExecutionPolicy Bypass -File desktop/pack-portable.ps1",
+    "desktop:pack": "bun run desktop:build && bun run desktop:portable",
     "desktop:backup-zip": "powershell -ExecutionPolicy Bypass -File desktop/backup-zip.ps1"
   },
   "overrides": {

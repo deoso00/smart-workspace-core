@@ -25,7 +25,15 @@ function serverRoot() {
     if (fs.existsSync(path.join(desktopOut, "server", "index.mjs"))) return desktopOut;
     return repoOut;
   }
-  return path.join(process.resourcesPath, "app-server");
+  // Packaged: resources/app-server (portable + electron-builder extraResources)
+  const candidates = [
+    path.join(process.resourcesPath, "app-server"),
+    path.join(path.dirname(process.execPath), "resources", "app-server"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(path.join(c, "server", "index.mjs"))) return c;
+  }
+  return candidates[0];
 }
 
 function loadEnvFile(filePath) {
@@ -199,6 +207,26 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Log avvio per diagnosi (%APPDATA%\zanto-ai\desktop-boot.log)
+  try {
+    const logDir = app.getPath("userData");
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(logDir, "desktop-boot.log"),
+      [
+        new Date().toISOString(),
+        `packaged=${app.isPackaged}`,
+        `execPath=${process.execPath}`,
+        `resourcesPath=${process.resourcesPath}`,
+        `serverRoot=${serverRoot()}`,
+        `entry=${path.join(serverRoot(), "server", "index.mjs")}`,
+        `entryExists=${fs.existsSync(path.join(serverRoot(), "server", "index.mjs"))}`,
+      ].join("\n") + "\n",
+    );
+  } catch {
+    /* ignore */
+  }
+
   try {
     startServer();
     await waitForServer();
