@@ -5,6 +5,7 @@ import {
   createByoProvider,
   createGeminiProvider,
   createLovableAiGatewayProvider,
+  sanitizeApiKey,
 } from "@/lib/ai-gateway.server";
 import {
   generateImage,
@@ -85,8 +86,16 @@ function formatChatError(error: unknown): string {
   if (status === 429 || /\b429\b/.test(raw) || detail.includes("rate limit") || detail.includes("resource_exhausted")) {
     return "Limite di richieste raggiunto (rate limit). Aspetta un minuto e riprova, o cambia modello.";
   }
-  if (status === 401 || status === 403 || detail.includes("api key") || detail.includes("unauthorized") || detail.includes("unauthenticated")) {
-    return "Chiave API non valida. Controlla Providers (Gemini / OpenRouter / Groq).";
+  if (
+    status === 401 ||
+    status === 403 ||
+    detail.includes("api key") ||
+    detail.includes("unauthorized") ||
+    detail.includes("unauthenticated") ||
+    detail.includes("user not found") ||
+    /invalid.{0,20}key/i.test(detail)
+  ) {
+    return "Chiave API non valida. OpenRouter: Providers → Rimuovi → incolla di nuovo una chiave sk-or-v1-… da https://openrouter.ai/keys (senza spazi/virgolette), oppure metti OPENROUTER_API_KEY nel .env su GitHub.";
   }
   if (status === 402 || detail.includes("no credit") || detail.includes("payment required") || detail.includes("insufficient")) {
     return "Crediti Lovable AI Gateway esauriti. In ZAnto: Agent OFF + Flash Lite, oppure passa a Gemini diretto / OpenRouter / Ollama. I crediti Build (chat editor Lovable) sono un altro bilancio.";
@@ -148,13 +157,23 @@ export const Route = createFileRoute("/api/chat")({
             const base = body.credential?.baseUrl?.trim() || "http://localhost:11434";
             model = createByoProvider("ollama", `${base.replace(/\/$/, "")}/v1`)(modelId);
           } else if (providerId === "openrouter") {
-            const apiKey =
-              body.credential?.apiKey?.trim() || process.env["OPENROUTER_API_KEY"]?.trim();
+            const apiKey = sanitizeApiKey(
+              body.credential?.apiKey || process.env["OPENROUTER_API_KEY"] || "",
+            );
             if (!apiKey) {
               return new Response(
                 JSON.stringify({
                   error:
                     "OpenRouter: manca la chiave. Aggiungi OPENROUTER_API_KEY nel .env (Lovable/Vercel) oppure incollala in Providers. Chiave gratis su https://openrouter.ai/keys",
+                }),
+                { status: 400, headers: { "content-type": "application/json" } },
+              );
+            }
+            if (!apiKey.startsWith("sk-or-")) {
+              return new Response(
+                JSON.stringify({
+                  error:
+                    "OpenRouter: la chiave non inizia con sk-or-. Hai forse incollato una chiave Gemini (AIza...)? Usa una chiave da https://openrouter.ai/keys",
                 }),
                 { status: 400, headers: { "content-type": "application/json" } },
               );

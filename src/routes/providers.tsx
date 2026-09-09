@@ -159,8 +159,23 @@ function CredentialForm({
       <Button
         size="sm"
         onClick={() => {
-          if (!value.trim() || value.startsWith("••")) return;
-          writeCredential(providerId, local ? { baseUrl: value.trim() } : { apiKey: value.trim() });
+          if (!value.trim() || value.startsWith("••")) {
+            toast.error("Incolla di nuovo la chiave intera (non i puntini ••••), poi Salva.");
+            return;
+          }
+          let cleaned = value.trim();
+          if (
+            (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+            (cleaned.startsWith("'") && cleaned.endsWith("'"))
+          ) {
+            cleaned = cleaned.slice(1, -1).trim();
+          }
+          if (/^bearer\s+/i.test(cleaned)) cleaned = cleaned.replace(/^bearer\s+/i, "").trim();
+          if (providerId === "openrouter" && !cleaned.startsWith("sk-or-")) {
+            toast.error("Chiave OpenRouter non valida: deve iniziare con sk-or- (da openrouter.ai/keys).");
+            return;
+          }
+          writeCredential(providerId, local ? { baseUrl: cleaned } : { apiKey: cleaned });
           toast.success("Credenziale salvata in questo browser");
           onSaved();
         }}

@@ -20,19 +20,35 @@ export function createLovableAiGatewayProvider(apiKey: string) {
   });
 }
 
+/** Strip quotes / accidental "Bearer " prefix from pasted or .env keys. */
+export function sanitizeApiKey(raw: string): string {
+  let key = raw.trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
+  }
+  if (/^bearer\s+/i.test(key)) key = key.replace(/^bearer\s+/i, "").trim();
+  return key;
+}
+
 /** Bring-your-own provider using an OpenAI-compatible endpoint. */
 export function createByoProvider(name: string, baseURL: string, apiKey?: string) {
-  const headers: Record<string, string> = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const key = apiKey ? sanitizeApiKey(apiKey) : undefined;
+  const headers: Record<string, string> = {};
   if (name === "openrouter") {
     headers["HTTP-Referer"] =
       process.env["OPENROUTER_HTTP_REFERER"]?.trim() ||
       process.env["VITE_APP_URL"]?.trim() ||
-      "https://github.com/deoso00/smart-workspace-core";
+      "https://smart-workspace-core.lovable.app";
     headers["X-Title"] = "ZAnto.AI";
   }
   return createOpenAICompatible({
     name,
     baseURL,
+    // Required: SDK auth uses apiKey (custom Authorization alone is unreliable).
+    ...(key ? { apiKey: key } : {}),
     headers,
   });
 }
