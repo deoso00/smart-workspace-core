@@ -16,6 +16,7 @@ import {
   cleanProviderSecret,
 } from "@/lib/zanto/providers";
 import { probeOpenRouterKey } from "@/lib/zanto/openrouter-client";
+import { probeGroqKey } from "@/lib/zanto/groq-client";
 
 export const Route = createFileRoute("/providers")({
   head: () => ({
@@ -172,6 +173,10 @@ function CredentialForm({
             );
             return;
           }
+          if (providerId === "groq" && !cleaned.startsWith("gsk_")) {
+            toast.error("Groq: incolla una chiave che inizia con gsk_ da console.groq.com/keys");
+            return;
+          }
           writeCredential(providerId, local ? { baseUrl: cleaned } : { apiKey: cleaned });
           toast.success("Credenziale salvata in questo browser");
           onSaved();
@@ -204,6 +209,26 @@ function CredentialForm({
               return;
             }
             const result = await probeOpenRouterKey(key);
+            if (result.ok) toast.success(result.detail);
+            else toast.error(result.detail);
+          }}
+        >
+          Testa chiave
+        </Button>
+      )}
+      {providerId === "groq" && (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={async () => {
+            const fromField =
+              value.trim() && !value.startsWith("••") ? cleanProviderSecret(value) : "";
+            const key = fromField || readCredential("groq").apiKey?.trim() || "";
+            if (!key) {
+              toast.error("Incolla la chiave gsk_… e Salva, oppure Testa subito dopo averla incollata.");
+              return;
+            }
+            const result = await probeGroqKey(key);
             if (result.ok) toast.success(result.detail);
             else toast.error(result.detail);
           }}

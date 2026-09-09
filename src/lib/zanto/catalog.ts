@@ -81,15 +81,29 @@ export const PROVIDERS: ProviderInfo[] = [
   },
   {
     id: "groq",
-    label: "Groq (chiave personale)",
+    label: "Groq (server remoto)",
     builtInKey: false,
     runtime: "cloud",
     keyLabel: "Groq API key (gsk_...)",
     docs: "https://console.groq.com/keys",
-    description: "Inferenza a bassissima latenza.",
+    description:
+      "Server remoto gratis: la RAM sta su Groq, tu chatti dal PC. Chiave gsk_… da console.groq.com. Agent ON crea file. Limiti free: se 429 aspetta o usa Ollama.",
     models: [
-      { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", note: "Versatile" },
-      { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", note: "Istantaneo" },
+      {
+        id: "llama-3.1-8b-instant",
+        label: "Llama 3.1 8B Instant",
+        note: "Consigliato — veloce + Agent",
+      },
+      {
+        id: "llama-3.3-70b-versatile",
+        label: "Llama 3.3 70B",
+        note: "Più forte — crea siti meglio",
+      },
+      {
+        id: "qwen/qwen3-32b",
+        label: "Qwen3 32B",
+        note: "Se disponibile sul tuo account",
+      },
     ],
   },
   {
@@ -143,14 +157,15 @@ export const PROVIDERS: ProviderInfo[] = [
     keyLabel: "Endpoint (default http://localhost:11434)",
     docs: "https://ollama.com",
     description:
-      "Runtime locale sulla tua macchina. Nessuna simulazione: se non risponde, ZAnto.AI dichiara il runtime non rilevato.",
+      "Gratis e ILLIMITATO sul tuo PC (nessun credito cloud). Agent ON crea file veri anche con modelli 1B/3B. Scarica: ollama pull llama3.2  oppure dolphin-mistral (7B, più lento).",
     models: [
-      { id: "dolphin-mistral", label: "Dolphin Mistral 7B", note: "7B — chat/code, più capace dei 1B" },
-      { id: "dolphin-llama3", label: "Dolphin Llama3 8B", note: "8B — coding + agent migliore" },
-      { id: "qwen2.5-coder", label: "qwen2.5-coder", note: "Locale codice (consigliato per app)" },
-      { id: "qwen2.5-coder:1.5b", label: "qwen2.5-coder:1.5b", note: "Locale codice leggero" },
-      { id: "llama3.2", label: "llama3.2", note: "Locale ~3B" },
-      { id: "llama3.2:1b", label: "llama3.2:1b", note: "Locale leggero" },
+      { id: "llama3.2:latest", label: "Llama 3.2 (~3B)", note: "Consigliato locale — veloce" },
+      { id: "llama3.2:1b", label: "Llama 3.2 1B", note: "Il più leggero" },
+      { id: "dolphin-mistral", label: "Dolphin Mistral 7B", note: "7B — più capace, più lento su CPU" },
+      { id: "dolphin-llama3", label: "Dolphin Llama3 8B", note: "8B — se l'hai scaricato" },
+      { id: "qwen2.5-coder", label: "qwen2.5-coder", note: "Locale codice" },
+      { id: "qwen2.5-coder:1.5b", label: "qwen2.5-coder:1.5b", note: "Codice leggero" },
+      { id: "llama3.2", label: "llama3.2", note: "Alias 3B" },
     ],
   },
 ];

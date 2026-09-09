@@ -170,7 +170,12 @@ export const Route = createFileRoute("/api/chat")({
             model = createLovableAiGatewayProvider(key)(modelId);
           } else if (providerId === "ollama") {
             const base = body.credential?.baseUrl?.trim() || "http://localhost:11434";
-            model = createByoProvider("ollama", `${base.replace(/\/$/, "")}/v1`)(modelId);
+            // Ollama OpenAI-compat often expects a dummy key; empty key can break the SDK.
+            model = createByoProvider(
+              "ollama",
+              `${base.replace(/\/$/, "")}/v1`,
+              "ollama",
+            )(modelId);
           } else if (providerId === "openrouter") {
             const apiKey = sanitizeApiKey(
               body.credential?.apiKey || process.env["OPENROUTER_API_KEY"] || "",

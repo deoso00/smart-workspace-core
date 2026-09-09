@@ -30,6 +30,8 @@ import { MODES, PROVIDERS, TOOLS, getProvider, type ModelInfo } from "@/lib/zant
 import { streamChat, type ToolActivity } from "@/lib/zanto/chat-client";
 import { streamOpenRouterChat } from "@/lib/zanto/openrouter-client";
 import { streamOpenRouterAgent } from "@/lib/zanto/openrouter-agent";
+import { streamOllamaAgent, streamOllamaChat } from "@/lib/zanto/ollama-agent";
+import { streamGroqAgent, streamGroqChat } from "@/lib/zanto/groq-client";
 import {
   cleanProviderSecret,
   isProviderConfigured,
@@ -68,13 +70,13 @@ export function ChatWorkspace() {
   );
   const [model, setModel] = useState(
     desktop
-      ? "llama3.2:1b"
+      ? "llama3.2:latest"
       : onLovableHost
         ? "openrouter/free"
         : "gemini-3.7-flash",
   );
   const [mode, setMode] = useState(desktop ? "LOCAL" : "AUTO");
-  const [agent, setAgent] = useState(false);
+  const [agent, setAgent] = useState(desktop);
 
   useEffect(() => {
     if (/veo|flash-image|image-generation/i.test(model)) {
@@ -313,8 +315,11 @@ export function ChatWorkspace() {
       };
 
       const openRouterKey = cleanProviderSecret(readCredential("openrouter").apiKey ?? "");
-      // OpenRouter sempre dal browser su Lovable (server toglie Authorization).
-      // Agent ON → tool VFS nel client; Agent OFF → chat semplice.
+      const groqKey = cleanProviderSecret(readCredential("groq").apiKey ?? "");
+      const ollamaBase =
+        readCredential("ollama").baseUrl?.trim() || "http://127.0.0.1:11434";
+
+      // OpenRouter / Groq / Ollama dal browser (RAM remota su Groq/OpenRouter; locale su Ollama).
       if (provider === "openrouter") {
         if (!openRouterKey.startsWith("sk-or-")) {
           toast.error(
@@ -338,6 +343,52 @@ export function ChatWorkspace() {
             messages: history,
             system:
               "Sei ZAnto.AI. Rispondi in italiano. Se l'utente chiede di creare file, digli di attivare Agent (toggle) e riprovare — non inventare comandi bash.",
+            handlers,
+            signal: controller.signal,
+          });
+        }
+      } else if (provider === "groq") {
+        if (!groqKey.startsWith("gsk_")) {
+          toast.error(
+            "Groq: Providers → Groq → incolla chiave gsk_… da https://console.groq.com/keys → Salva.",
+          );
+          sawError = true;
+          setInput(text);
+        } else if (agent) {
+          await streamGroqAgent({
+            apiKey: groqKey,
+            model,
+            workspaceId,
+            messages: history,
+            handlers,
+            signal: controller.signal,
+          });
+        } else {
+          await streamGroqChat({
+            apiKey: groqKey,
+            model,
+            messages: history,
+            system:
+              "Sei ZAnto.AI su Groq. Rispondi in italiano. Per creare file: attiva Agent e riprova.",
+            handlers,
+            signal: controller.signal,
+          });
+        }
+      } else if (provider === "ollama") {
+        if (agent) {
+          await streamOllamaAgent({
+            baseUrl: ollamaBase,
+            model,
+            workspaceId,
+            messages: history,
+            handlers,
+            signal: controller.signal,
+          });
+        } else {
+          await streamOllamaChat({
+            baseUrl: ollamaBase,
+            model,
+            messages: history,
             handlers,
             signal: controller.signal,
           });
@@ -593,13 +644,35 @@ export function ChatWorkspace() {
           </div>
         )}
 
+        {provider === "ollama" && (
+          <div className="flex items-start gap-2 border-b border-border bg-emerald-500/10 px-4 py-2 text-xs">
+            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+            <span>
+              Ollama locale = gratis illimitato sul PC. Tieni <strong>Agent ON</strong> per creare file
+              (anche con Llama 3B). Prova: «crea /index.html con ciao mondo». Poi Anteprima.
+            </span>
+          </div>
+        )}
+
+        {provider === "groq" && (
+          <div className="flex items-start gap-2 border-b border-border bg-sky-500/10 px-4 py-2 text-xs">
+            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-sky-600" />
+            <span>
+              <strong>Groq = server remoto</strong> (RAM loro). In Providers incolla <code>gsk_…</code> da{" "}
+              <a className="underline" href="https://console.groq.com/keys" target="_blank" rel="noreferrer">
+                console.groq.com/keys
+              </a>
+              . Agent ON + Llama 8B/70B per creare file. Se non riesci a registrarti, resta Ollama.
+            </span>
+          </div>
+        )}
+
         {provider === "openrouter" && (
           <div className="flex items-start gap-2 border-b border-border bg-amber-500/10 px-4 py-2 text-xs">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
             <span>
-              OpenRouter free: ~<strong>50 msg/giorno</strong> in totale (tutti i modelli :free insieme).
-              Se il limite compare su tutti, <strong>non cambiare modello</strong> — spegni Agent, usa{" "}
-              <strong>Ollama</strong> (PC) / <strong>Gemini</strong>, o aspetta il reset.
+              OpenRouter free: ~50 msg/giorno totali. Se limite su tutti i modelli, usa{" "}
+              <strong>Groq</strong> (remoto) o <strong>Ollama</strong> (PC).
             </span>
           </div>
         )}
