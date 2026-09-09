@@ -96,15 +96,15 @@ async function runTool(
       return { nodes: nodes.map((n) => ({ path: n.path, kind: n.kind })) };
     }
     case "vfs_read": {
-      const path = String(args.path ?? "");
+      const path = String(args['path'] ?? "");
       const nodes = await listNodes(workspaceId);
       const hit = nodes.find((n) => n.path === path);
       if (!hit) return { error: `File non trovato: ${path}` };
       return { path: hit.path, kind: hit.kind, content: hit.content ?? "" };
     }
     case "vfs_write": {
-      const path = String(args.path ?? "");
-      const content = String(args.content ?? "");
+      const path = String(args['path'] ?? "");
+      const content = String(args['content'] ?? "");
       if (!path.startsWith("/")) return { error: "Il path deve iniziare con /" };
       const node = await writeFile(workspaceId, path, content);
       return { ok: true, path: node.path };
@@ -114,7 +114,7 @@ async function runTool(
       return { notes: notes.map((n) => ({ label: n.label, body: n.body })) };
     }
     case "memory_save": {
-      const note = await saveMemory(workspaceId, String(args.label ?? ""), String(args.body ?? ""));
+      const note = await saveMemory(workspaceId, String(args['label'] ?? ""), String(args['body'] ?? ""));
       return { ok: true, id: note.id };
     }
     default:
