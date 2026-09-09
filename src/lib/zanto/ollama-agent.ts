@@ -4,6 +4,7 @@
  */
 import type { StreamHandlers, ToolActivity } from "./chat-client";
 import { listNodes, writeFile } from "./db";
+import { localVfsWrite } from "./local-vfs";
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -71,6 +72,20 @@ function extractFencedFiles(text: string): { path: string; content: string }[] {
     }
   }
   return out;
+}
+
+/** Last resort: raw HTML dumped in the chat without fences/tags. */
+function extractRawHtml(text: string): { path: string; content: string }[] {
+  const match = text.match(/<!DOCTYPE\s+html[\s\S]*?<\/html>/i) || text.match(/<html[\s>][\s\S]*?<\/html>/i);
+  if (!match) return [];
+  return [{ path: "/index.html", content: match[0]!.trim() }];
+}
+
+function collectWrites(text: string): { path: string; content: string }[] {
+  let writes = parseWrites(text);
+  if (writes.length === 0) writes = extractFencedFiles(text);
+  if (writes.length === 0) writes = extractRawHtml(text);
+  return writes;
 }
 
 async function ollamaChat(opts: {
@@ -143,13 +158,9 @@ export async function streamOllamaAgent(opts: {
       return;
     }
 
-    let writes = parseWrites(reply);
+    let writes = collectWrites(reply);
     const reads = parseReads(reply);
     const list = wantsList(reply);
-
-    if (writes.length === 0 && !list && reads.length === 0) {
-      writes = extractFencedFiles(reply);
-    }
 
     // Strip protocol tags from what we show the user
     const visible = reply
@@ -161,10 +172,9 @@ export async function streamOllamaAgent(opts: {
     if (visible) opts.handlers.onText((step > 0 ? "\n" : "") + visible);
 
     if (writes.length === 0 && !list && reads.length === 0) {
-      // Model finished talking without tools
       if (!wroteAny) {
         opts.handlers.onText(
-          "\n\n⚠️ Il modello non ha creato file. Riprova con Agent ON e chiedi esplicitamente: «crea /index.html con una pagina ciao mondo». Oppure usa llama3.2:latest.",
+          "\n\n⚠️ Il modello non ha creato file. Riprova con Agent ON e chiedi: «crea /index.html con ciao mondo».",
         );
       }
       return;
@@ -225,12 +235,20 @@ export async function streamOllamaAgent(opts: {
       };
       opts.handlers.onTool(activity);
       try {
-        await writeFile(opts.workspaceId, path, w.content);
+        // Always keep a local copy first (Anteprima works even if Supabase fails).
+        localVfsWrite(opts.workspaceId, path, w.content);
+        try {
+          await writeFile(opts.workspaceId, path, w.content);
+        } catch (cloudErr) {
+          // Local save already done — warn but continue.
+          const msg = cloudErr instanceof Error ? cloudErr.message : String(cloudErr);
+          opts.handlers.onText(`\n(Nota: salvato in locale; sync cloud lento: ${msg.slice(0, 80)})`);
+        }
         wroteAny = true;
         opts.handlers.onTool({
           ...activity,
           status: "done",
-          output: { path, bytes: w.content.length },
+          output: { path, bytes: w.content.length, local: true },
         });
         toolResults.push(`OK scritto ${path} (${w.content.length} caratteri)`);
         opts.handlers.onText(`\n✓ creato ${path}`);

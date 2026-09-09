@@ -167,11 +167,12 @@ async function showOllamaGuideIfNeeded() {
     title: "Ollama non rilevato",
     message: "ZAnto Desktop usa Ollama in locale, ma non risponde su http://127.0.0.1:11434",
     detail:
-      "1) Installa Ollama da https://ollama.com\n" +
-      "2) Apri un terminale e lancia:\n   ollama pull llama3.2:1b\n" +
-      "3) Assicurati che Ollama sia in esecuzione (icona nella system tray)\n" +
-      "4) In ZAnto: Providers → Ollama → http://localhost:11434\n\n" +
-      "Puoi comunque usare OpenRouter/Gemini se hai le chiavi.",
+      "ZAnto usa SOLO Ollama su http://127.0.0.1:11434 (non un altro 'Llama Server.exe').\n\n" +
+      "1) Installa/avvia Ollama: https://ollama.com\n" +
+      "2) Anche se chiudi la finestra, Ollama resta spesso attivo nella system tray\n" +
+      "3) Scarica un modello:\n   ollama pull llama3.2\n" +
+      "4) Providers → Ollama → http://localhost:11434\n\n" +
+      "Puoi comunque usare OpenRouter/Gemini/Groq se hai le chiavi.",
     buttons: ["Apri ollama.com", "Continua comunque", "Esci"],
     defaultId: 0,
     cancelId: 1,

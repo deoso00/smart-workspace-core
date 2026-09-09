@@ -452,27 +452,27 @@ export function ChatWorkspace() {
       );
       const incomplete =
         /creazione incompleta|limite di step/i.test(assembled) || controller.signal.aborted;
-      if (writes.length > 0) {
+      const htmlInText = /<!DOCTYPE\s+html|<html[\s>]/i.test(assembled);
+      if (writes.length > 0 || (provider === "ollama" && htmlInText)) {
         const paths = writes
           .map((t) => {
             const inputObj = t.input as { path?: string } | undefined;
             return inputObj?.path;
           })
           .filter(Boolean) as string[];
-        const hasHtml = paths.some((p) => /\.html?$/i.test(p));
+        if (paths.length === 0 && htmlInText) paths.push("/index.html");
+        const hasHtml = paths.some((p) => /\.html?$/i.test(p)) || htmlInText;
         setRunStatus(incomplete ? "incomplete" : "done");
         setLastDoneSummary(
           incomplete
-            ? `Scritti ${writes.length} file, ma il giro Agent non è completo. Scrivi «continua» senza rifare tutto il prompt.`
-            : `Creazione finita · ${writes.length} file${paths.length ? `: ${paths.slice(0, 4).join(", ")}` : ""}${hasHtml ? " · Anteprima disponibile" : ""}`,
+            ? `Scritti ${Math.max(writes.length, 1)} file, ma il giro Agent non è completo. Scrivi «continua».`
+            : `Creazione finita · ${paths.slice(0, 4).join(", ") || "file"}${hasHtml ? " · Anteprima" : ""}`,
         );
-        if (hasHtml) {
-          setPreviewOpen(true);
-          setPreviewRefresh((n) => n + 1);
-          toast.success("File pronti — anteprima aperta a destra.");
-        } else {
-          toast.success("Creazione finita. Controlla i file a sinistra.");
-        }
+        // Always open preview panel after local create attempts (md: visible on desktop).
+        setPreviewOpen(true);
+        setPreviewRefresh((n) => n + 1);
+        if (hasHtml) toast.success("File pronti — apri Anteprima (pulsante in alto a destra).");
+        else toast.success("Creazione finita. Controlla i file a sinistra.");
       } else if (!sawError && !controller.signal.aborted) {
         setRunStatus("done");
         setLastDoneSummary("Risposta completa.");
@@ -648,8 +648,9 @@ export function ChatWorkspace() {
           <div className="flex items-start gap-2 border-b border-border bg-emerald-500/10 px-4 py-2 text-xs">
             <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
             <span>
-              Ollama locale = gratis illimitato sul PC. Tieni <strong>Agent ON</strong> per creare file
-              (anche con Llama 3B). Prova: «crea /index.html con ciao mondo». Poi Anteprima.
+              ZAnto usa <strong>solo Ollama</strong> su <code>127.0.0.1:11434</code> — non un altro
+              &quot;Llama Server.exe&quot;. Se chiudi la finestra Ollama, il servizio resta spesso nella
+              tray: per questo risponde comunque. Agent ON → crea file + Anteprima.
             </span>
           </div>
         )}
@@ -839,7 +840,7 @@ export function ChatWorkspace() {
       </section>
 
       {previewOpen && (
-        <div className="hidden w-[min(42%,28rem)] shrink-0 md:flex md:flex-col lg:w-[min(46%,36rem)]">
+        <div className="flex w-[min(100%,28rem)] shrink-0 flex-col border-l border-border md:w-[min(42%,28rem)] lg:w-[min(46%,36rem)]">
           <PreviewPanel
             workspaceId={workspaceId}
             refreshKey={previewRefresh}

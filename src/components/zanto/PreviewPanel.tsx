@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { listNodes } from "@/lib/zanto/db";
+import { mergeLocalOverRemote } from "@/lib/zanto/local-vfs";
 import {
   filesFromVfsNodes,
   pickPreviewEntry,
@@ -34,8 +35,9 @@ export function PreviewPanel({ workspaceId, refreshKey = 0, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const nodes = await listNodes(workspaceId);
-      const files = filesFromVfsNodes(nodes);
+      const nodes = await listNodes(workspaceId).catch(() => []);
+      const merged = mergeLocalOverRemote(workspaceId, nodes);
+      const files = filesFromVfsNodes(merged);
       const entry = pickPreviewEntry(files);
       if (!entry) {
         disposeCurrent();

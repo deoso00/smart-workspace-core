@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteNode, listNodes, renameNode, writeFile, createFolder, type VfsNode } from "@/lib/zanto/db";
 import { downloadFile, downloadZip } from "@/lib/zanto/export";
+import { localVfsList, localVfsWrite } from "@/lib/zanto/local-vfs";
 
 type TreeNode = VfsNode & { children: TreeNode[] };
 
@@ -56,7 +57,30 @@ export function FileExplorer({
   const queryClient = useQueryClient();
   const { data: nodes = [] } = useQuery({
     queryKey: ["vfs", workspaceId],
-    queryFn: () => listNodes(workspaceId),
+    queryFn: async () => {
+      const remote = await listNodes(workspaceId).catch(() => [] as VfsNode[]);
+      const byPath = new Map(remote.map((n) => [n.path, n]));
+      for (const file of localVfsList(workspaceId)) {
+        const existing = byPath.get(file.path);
+        if (existing && existing.kind === "file") {
+          byPath.set(file.path, { ...existing, content: file.content });
+        } else if (!existing) {
+          byPath.set(file.path, {
+            id: `local:${file.path}`,
+            workspace_id: workspaceId,
+            owner_key: "local",
+            parent_id: null,
+            kind: "file",
+            name: file.path.split("/").pop() || file.path,
+            path: file.path,
+            content: file.content,
+            created_at: file.updatedAt,
+            updated_at: file.updatedAt,
+          } as VfsNode);
+        }
+      }
+      return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+    },
   });
   const tree = useMemo(() => buildTree(nodes), [nodes]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
